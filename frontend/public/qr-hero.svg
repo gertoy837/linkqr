@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400" fill="none">
+  <defs>
+    <pattern id="qrp" width="56" height="56" patternUnits="userSpaceOnUse">
+      <rect width="14" height="14" fill="#0f172a"/>
+      <rect x="28" y="14" width="14" height="14" fill="#0f172a"/>
+      <rect x="14" y="28" width="14" height="14" fill="#0f172a"/>
+      <rect x="42" y="42" width="14" height="14" fill="#0f172a"/>
+      <rect y="42" width="14" height="14" fill="#0f172a"/>
+      <rect x="42" width="14" height="14" fill="#4f46e5"/>
+    </pattern>
+    <linearGradient id="qrg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="400" height="400" rx="36" fill="#ffffff"/>
+
+  <rect x="136" y="24" width="128" height="98" fill="url(#qrp)"/>
+  <rect x="278" y="136" width="98" height="240" fill="url(#qrp)"/>
+  <rect x="136" y="136" width="128" height="240" fill="url(#qrp)"/>
+  <rect x="24" y="136" width="98" height="128" fill="url(#qrp)"/>
+
+  <rect x="24" y="24" width="98" height="98" rx="16" fill="#0f172a"/>
+  <rect x="38" y="38" width="70" height="70" rx="10" fill="#ffffff"/>
+  <rect x="52" y="52" width="42" height="42" rx="8" fill="#4f46e5"/>
+
+  <rect x="278" y="24" width="98" height="98" rx="16" fill="#0f172a"/>
+  <rect x="292" y="38" width="70" height="70" rx="10" fill="#ffffff"/>
+  <rect x="306" y="52" width="42" height="42" rx="8" fill="#4f46e5"/>
+
+  <rect x="24" y="278" width="98" height="98" rx="16" fill="#0f172a"/>
+  <rect x="38" y="292" width="70" height="70" rx="10" fill="#ffffff"/>
+  <rect x="52" y="306" width="42" height="42" rx="8" fill="#4f46e5"/>
+
+  <rect x="168" y="168" width="64" height="64" rx="18" fill="url(#qrg)"/>
+  <path d="M184 184h9v9h-9zM207 184h9v9h-9zM184 207h9v9h-9zM199 199h7v7h-7zM212 207h7v7h-7zM204 212h7v7h-7z" fill="#ffffff"/>
+</svg>
