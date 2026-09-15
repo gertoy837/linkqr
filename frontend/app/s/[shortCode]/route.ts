@@ -7,8 +7,16 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL || 'https://qr-api.gertoy.biz.id/api';
 
 function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string
+  return s.replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[c] as string
   );
 }
 
@@ -48,16 +56,26 @@ function notFoundPage(shortCode: string): string {
 </html>`;
 }
 
+function getHeader(req: NextRequest, name: string): string {
+  const v = req.headers.get(name.toLowerCase());
+  return typeof v === 'string' ? v.trim() : '';
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ shortCode: string }> }
 ) {
   const { shortCode } = await params;
 
-  const ua = request.headers.get('user-agent') || '';
-  const referer = request.headers.get('referer') || '';
-  const forwarded = request.headers.get('x-forwarded-for') || '';
-  const realIp = (request.headers.get('x-real-ip') || forwarded.split(',')[0] || '').trim();
+  const ua = getHeader(request, 'user-agent');
+  const referer = getHeader(request, 'referer');
+
+  const cfIp = getHeader(request, 'cf-connecting-ip');
+  const realIp = getHeader(request, 'x-real-ip');
+  const forwarded = getHeader(request, 'x-forwarded-for');
+  const visitorIp = cfIp || realIp || (forwarded ? forwarded.split(',')[0].trim() : '');
+
+  const cfCountry = getHeader(request, 'cf-ipcountry');
 
   try {
     const res = await fetch(`${API_URL}/s/${encodeURIComponent(shortCode)}`, {
@@ -68,7 +86,8 @@ export async function GET(
         'User-Agent': ua,
         Referer: referer,
         Accept: 'application/json, text/html',
-        ...(realIp ? { 'X-Real-IP': realIp, 'X-Forwarded-For': realIp } : {}),
+        ...(visitorIp ? { 'X-Visitor-IP': visitorIp } : {}),
+        ...(cfCountry ? { 'X-Visitor-Country': cfCountry } : {}),
       },
     });
 
