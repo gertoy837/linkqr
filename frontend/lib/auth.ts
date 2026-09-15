@@ -15,6 +15,7 @@ export interface User {
   email: string;
   created_at: string;
   tenant_id?: number;
+  is_admin?: boolean;
   tenant?: TenantInfo;
 }
 

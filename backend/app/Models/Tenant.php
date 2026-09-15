@@ -33,6 +33,11 @@ class Tenant extends Model
         return $this->hasMany(QrCode::class);
     }
 
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
+    }
+
     // ---------------------------------------------------------------------
     // Plan helpers
     // ---------------------------------------------------------------------

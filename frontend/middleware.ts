@@ -11,6 +11,8 @@ export function middleware(request: NextRequest) {
   const isPublic = publicRoutes.some(route => path === route || path.startsWith('/s/'));
   const isAuth = authRoutes.some(route => path === route);
 
+  // `/admin` is protected here too, but the real gate is the API's `admin`
+  // middleware — the client-side check in app/admin/layout.tsx is only UX.
   if (!token && !isPublic && !path.startsWith('/api/')) {
     return NextResponse.redirect(new URL('/login', request.url));
   }

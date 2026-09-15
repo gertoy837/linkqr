@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminInvoiceController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\RedirectController;
@@ -30,6 +32,23 @@ Route::middleware('auth:sanctum')->group(function () {
     // Plans & billing
     Route::get('/plan', [PlanController::class, 'show']);
     Route::post('/plan/select', [PlanController::class, 'select']);
+
+    // Invoices (manual QRIS / future gateways)
+    Route::get('/invoices', [InvoiceController::class, 'index']);
+    Route::post('/invoices', [InvoiceController::class, 'store']);
+    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);
+    Route::post('/invoices/{invoice}/proof', [InvoiceController::class, 'uploadProof']);
+    Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
+
+    // Operator console
+    Route::middleware('admin')->prefix('admin')->group(function () {
+        Route::get('/overview', [AdminInvoiceController::class, 'overview']);
+        Route::get('/invoices', [AdminInvoiceController::class, 'index']);
+        Route::get('/invoices/{invoice}', [AdminInvoiceController::class, 'show']);
+        Route::post('/invoices/{invoice}/verify', [AdminInvoiceController::class, 'verify']);
+        Route::post('/invoices/{invoice}/reject', [AdminInvoiceController::class, 'reject']);
+        Route::post('/tenants/{tenant}/plan', [AdminInvoiceController::class, 'setTenantPlan']);
+    });
 
     // QR Codes
     Route::apiResource('qr-codes', QrCodeController::class)->except(['create', 'edit']);

@@ -19,6 +19,11 @@ class User extends Authenticatable
         'email',
         'password',
         'tenant_id',
+        'is_admin',
+    ];
+
+    protected $casts = [
+        'is_admin' => 'boolean',
     ];
 
     protected $hidden = [
@@ -42,6 +47,11 @@ class User extends Authenticatable
     public function qrCodes(): HasMany
     {
         return $this->hasMany(QrCode::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 
     // ---------------------------------------------------------------------

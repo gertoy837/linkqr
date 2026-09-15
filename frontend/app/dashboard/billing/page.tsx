@@ -16,7 +16,10 @@ import {
   Crown,
   Infinity as InfinityIcon,
   Clock,
+  ReceiptText,
+  History,
 } from 'lucide-react';
+import { InvoiceDialog, type Invoice, type InvoiceInstructions } from '@/components/dashboard/invoice-dialog';
 
 interface Usage {
   qr_used: number;
@@ -75,11 +78,23 @@ export default function BillingPage() {
   const [switching, setSwitching] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Payment flow: a paid plan now creates an invoice instead of flipping the
+  // plan server-side, so the dialog carries the QRIS + proof upload.
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeInvoice, setActiveInvoice] = useState<Invoice | null>(null);
+  const [activeInstructions, setActiveInstructions] = useState<InvoiceInstructions | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+
   const fetchPlan = useCallback(async () => {
     try {
-      const res = await api.get<PlanResponse>('/plan');
-      setData(res.data);
-      setCycle(res.data.current.billing_cycle === 'yearly' ? 'yearly' : 'monthly');
+      const [planRes, invRes] = await Promise.all([
+        api.get<PlanResponse>('/plan'),
+        api.get<Invoice[]>('/invoices'),
+      ]);
+      setData(planRes.data);
+      setCycle(planRes.data.current.billing_cycle === 'yearly' ? 'yearly' : 'monthly');
+      setInvoices(invRes.data ?? []);
       setError(null);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Gagal memuat data paket');
@@ -105,23 +120,49 @@ export default function BillingPage() {
 
     setSwitching(planKey);
     try {
-      const res = await api.post('/plan/select', {
+      // POST /invoices is the single entry point: a free plan flips directly,
+      // a paid plan returns an invoice + the QRIS instructions to display.
+      const res = await api.post('/invoices', {
         plan: planKey,
         billing_cycle: cycle,
       });
-      toast({
-        title: 'Paket diperbarui',
-        description: res.data?.message || 'Paket berhasil diubah.',
-      });
+
+      if (res.data?.requires_payment === false) {
+        toast({
+          title: 'Paket diperbarui',
+          description: res.data?.message || 'Paket berhasil diubah.',
+        });
+        await fetchPlan();
+        return;
+      }
+
+      setActiveInvoice(res.data.invoice as Invoice);
+      setActiveInstructions(res.data.instructions as InvoiceInstructions);
+      setDialogOpen(true);
       await fetchPlan();
     } catch (err: any) {
       toast({
-        title: 'Gagal mengubah paket',
+        title: 'Gagal memproses paket',
         description: err?.response?.data?.message || 'Coba lagi sebentar.',
         variant: 'destructive',
       });
     } finally {
       setSwitching(null);
+    }
+  };
+
+  const openInvoice = async (inv: Invoice) => {
+    try {
+      const res = await api.get(`/invoices/${inv.id}`);
+      setActiveInvoice(res.data.invoice as Invoice);
+      setActiveInstructions(res.data.instructions as InvoiceInstructions);
+      setDialogOpen(true);
+    } catch (err: any) {
+      toast({
+        title: 'Gagal membuka invoice',
+        description: err?.response?.data?.message || 'Coba lagi.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -435,6 +476,87 @@ export default function BillingPage() {
         </div>
       </div>
 
+      {/* Invoice history */}
+      {invoices.length > 0 && (
+        <Card className="border border-neutral-200/80 shadow-xs rounded-2xl bg-white">
+          <CardHeader className="pb-3 border-b border-neutral-100">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+                <History className="h-4 w-4 text-indigo-600" />
+                Riwayat Tagihan
+              </CardTitle>
+              <button
+                onClick={() => setShowHistory((v) => !v)}
+                className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-700"
+              >
+                {showHistory ? 'Sembunyikan' : `Lihat (${invoices.length})`}
+              </button>
+            </div>
+          </CardHeader>
+
+          {showHistory && (
+            <CardContent className="pt-4 space-y-2.5">
+              {invoices.map((inv) => {
+                const actionable = ['pending', 'awaiting_verification', 'rejected'].includes(inv.status);
+                return (
+                  <button
+                    key={inv.id}
+                    onClick={() => openInvoice(inv)}
+                    disabled={!actionable}
+                    className={`w-full text-left flex items-center gap-3.5 p-3.5 rounded-xl border transition-all ${
+                      actionable
+                        ? 'border-indigo-100 bg-indigo-50/40 hover:bg-indigo-50'
+                        : 'border-neutral-100 hover:bg-neutral-50'
+                    }`}
+                  >
+                    <div
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                        inv.status === 'paid'
+                          ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
+                          : inv.status === 'awaiting_verification'
+                            ? 'bg-amber-50 border-amber-100 text-amber-600'
+                            : inv.status === 'rejected'
+                              ? 'bg-red-50 border-red-100 text-red-600'
+                              : 'bg-neutral-100 border-neutral-200 text-neutral-500'
+                      }`}
+                    >
+                      <ReceiptText className="h-4 w-4" />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-neutral-900 truncate">
+                        {inv.plan === 'business_pro' ? 'Business Pro' : inv.plan} ·{' '}
+                        {inv.billing_cycle === 'yearly' ? 'Tahunan' : 'Bulanan'}
+                      </p>
+                      <p className="text-[10px] font-mono text-neutral-400 mt-0.5">{inv.number}</p>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-extrabold text-neutral-900 tabular-nums">
+                        {rupiah(inv.total_amount)}
+                      </p>
+                      <span
+                        className={`text-[10px] font-bold ${
+                          inv.status === 'paid'
+                            ? 'text-emerald-600'
+                            : inv.status === 'awaiting_verification'
+                              ? 'text-amber-600'
+                              : inv.status === 'rejected'
+                                ? 'text-red-600'
+                                : 'text-neutral-500'
+                        }`}
+                      >
+                        {inv.status_label}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </CardContent>
+          )}
+        </Card>
+      )}
+
       {/* Footer note */}
       <Card className="border border-neutral-200/80 shadow-xs rounded-2xl bg-neutral-50/60">
         <CardContent className="p-5 flex items-start gap-3">
@@ -442,17 +564,24 @@ export default function BillingPage() {
             <Sparkles className="h-4 w-4 text-indigo-600" />
           </div>
           <div>
-            <p className="text-xs font-bold text-neutral-900">
-              Belum tersambung ke payment gateway
-            </p>
+            <p className="text-xs font-bold text-neutral-900">Pembayaran via QRIS</p>
             <p className="text-[11px] text-neutral-500 mt-1 leading-relaxed">
-              Perubahan paket aktif seketika. Untuk menjual langganan otomatis, sambungkan
-              Midtrans atau Stripe di <code className="font-mono">PlanController@select</code> —
-              blok aktivasinya sudah dipisah agar tinggal dipanggil dari webhook pembayaran.
+              Bayar paket berbayar dengan scan QRIS, lalu unggah bukti transfer. Admin akan
+              memverifikasi dan paket aktif otomatis. Gateway otomatis (Midtrans/Stripe) bisa
+              ditambahkan nanti tanpa mengubah halaman ini.
             </p>
           </div>
         </CardContent>
       </Card>
+
+      <InvoiceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        invoice={activeInvoice}
+        instructions={activeInstructions}
+        onProofUploaded={fetchPlan}
+        onCancelled={fetchPlan}
+      />
     </div>
   );
 }

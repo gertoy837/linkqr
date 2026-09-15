@@ -13,6 +13,14 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // Let the browser set `multipart/form-data; boundary=...` itself when a
+  // FormData body is sent. Leaving the default application/json header on
+  // makes Laravel reject the upload, because the boundary never matches.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+
   return config;
 });
 

@@ -12,6 +12,7 @@ import {
   PlusCircle,
   ExternalLink,
   CreditCard,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -165,6 +166,19 @@ export function DashboardSidebar() {
           <ExternalLink className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600" />
           <span>Lihat Landing Page</span>
         </Link>
+
+        {/* Operator console — hidden unless the signed-in user is an admin.
+            The API enforces this too; hiding it is just so customers never
+            see a menu item that would 403 them. */}
+        {user?.is_admin && (
+          <Link
+            href="/admin"
+            className="group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-indigo-600 hover:bg-indigo-50 transition-colors"
+          >
+            <ShieldCheck className="h-4 w-4 text-indigo-500" />
+            <span>Console Admin</span>
+          </Link>
+        )}
       </nav>
 
       {/* Profile & Logout Footer */}
