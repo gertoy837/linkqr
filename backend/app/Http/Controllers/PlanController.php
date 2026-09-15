@@ -23,7 +23,7 @@ class PlanController extends Controller
         }
 
         return response()->json([
-            'current' => $this->tenantPayload($tenant),
+            'current' => $this->userPayload($request->user()),
             'plans' => $this->planCatalogue(),
         ]);
     }
@@ -79,23 +79,29 @@ class PlanController extends Controller
 
         return response()->json([
             'message' => "Paket berhasil diubah ke {$definition['name']}.",
-            'current' => $this->tenantPayload($tenant->fresh()),
+            'current' => $this->userPayload($request->user()->fresh()),
         ]);
     }
 
-    private function tenantPayload(Tenant $tenant): array
+    /**
+     * Usage is counted per USER even though the plan is stored on the tenant.
+     * The dashboard lists this user's own QR codes, so a tenant-wide count made
+     * the usage bar disagree with the list.
+     */
+    private function userPayload(\App\Models\User $user): array
     {
-        $qrLimit = $tenant->qrLimit();
-        $scanLimit = $tenant->scanLimit();
-        $qrUsed = $tenant->qrUsed();
-        $scansUsed = $tenant->scansThisMonth();
+        $qrLimit = $user->qrLimit();
+        $scanLimit = $user->scanLimit();
+        $qrUsed = $user->qrUsed();
+        $scansUsed = $user->scansThisMonth();
+        $tenant = $user->tenant;
 
         return [
-            'plan' => $tenant->plan,
-            'plan_name' => $tenant->planName(),
-            'billing_cycle' => $tenant->billing_cycle,
-            'plan_expires_at' => optional($tenant->plan_expires_at)->toIso8601String(),
-            'is_expired' => $tenant->isExpired(),
+            'plan' => $tenant?->plan ?? 'starter',
+            'plan_name' => $user->planName(),
+            'billing_cycle' => $tenant?->billing_cycle ?? 'monthly',
+            'plan_expires_at' => optional($tenant?->plan_expires_at)->toIso8601String(),
+            'is_expired' => $tenant?->isExpired() ?? false,
             'usage' => [
                 'qr_used' => $qrUsed,
                 'qr_limit' => $qrLimit,
@@ -103,9 +109,11 @@ class PlanController extends Controller
                 'scans_used' => $scansUsed,
                 'scan_limit' => $scanLimit,
                 'scan_remaining' => $scanLimit === null ? null : max(0, $scanLimit - $scansUsed),
-                'over_scan_limit' => $tenant->isOverScanLimit(),
+                // Per-user, like every other number here: the tenant-wide count
+                // included colleagues' scans and lit the warning for the wrong person.
+                'over_scan_limit' => $user->isOverScanLimit(),
             ],
-            'features' => $tenant->planDefinition()['features'] ?? [],
+            'features' => $tenant?->planDefinition()['features'] ?? [],
         ];
     }
 

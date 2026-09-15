@@ -31,16 +31,21 @@ class QrCodeController extends Controller
         // Enforce the plan's QR quota. The landing page advertises "5 QR Code
         // Dinamis" on Starter, so the limit has to actually exist server-side -
         // otherwise the tier is just marketing copy.
-        $tenant = $request->user()->tenant;
+        //
+        // Counted per USER, not per tenant: the dashboard lists this user's own
+        // QR codes, so a shared-tenant count made the usage bar disagree with
+        // the list (a user with 4 QR saw "5/5 habis" because a colleague's QR
+        // was included).
+        $user = $request->user();
 
-        if ($tenant && !$tenant->canCreateQr()) {
+        if (!$user->canCreateQr()) {
             return response()->json([
-                'message' => "Kuota QR Code paket {$tenant->planName()} sudah habis "
-                    . "({$tenant->qrUsed()}/{$tenant->qrLimit()}). Upgrade paket untuk menambah QR.",
+                'message' => "Kuota QR Code paket {$user->planName()} sudah habis "
+                    . "({$user->qrUsed()}/{$user->qrLimit()}). Upgrade paket untuk menambah QR.",
                 'code' => 'qr_limit_reached',
                 'usage' => [
-                    'qr_used' => $tenant->qrUsed(),
-                    'qr_limit' => $tenant->qrLimit(),
+                    'qr_used' => $user->qrUsed(),
+                    'qr_limit' => $user->qrLimit(),
                 ],
             ], 403);
         }
