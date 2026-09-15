@@ -23,9 +23,12 @@ export async function register(name: string, email: string, password: string, pa
 }
 
 export async function logout(): Promise<void> {
-  await api.post('/logout');
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
+  try {
+    await api.post('/logout');
+  } catch {
+    // ignore network errors on logout
+  }
+  clearAuth();
 }
 
 export function getToken(): string | null {
@@ -44,9 +47,26 @@ export function getUser(): User | null {
   }
 }
 
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+
 export function setAuth(token: string, user: User): void {
   localStorage.setItem('token', token);
   localStorage.setItem('user', JSON.stringify(user));
+
+  // Mirror the token into a cookie as well: the Next.js middleware runs on the
+  // edge and cannot read localStorage, so without this every request to
+  // /dashboard gets bounced straight back to /login even after a successful login.
+  if (typeof document !== 'undefined') {
+    document.cookie = `token=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+  }
+}
+
+export function clearAuth(): void {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  if (typeof document !== 'undefined') {
+    document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
+  }
 }
 
 export function isAuthenticated(): boolean {
