@@ -28,6 +28,23 @@ class QrCodeController extends Controller
             'logo' => 'nullable|string',
         ]);
 
+        // Enforce the plan's QR quota. The landing page advertises "5 QR Code
+        // Dinamis" on Starter, so the limit has to actually exist server-side -
+        // otherwise the tier is just marketing copy.
+        $tenant = $request->user()->tenant;
+
+        if ($tenant && !$tenant->canCreateQr()) {
+            return response()->json([
+                'message' => "Kuota QR Code paket {$tenant->planName()} sudah habis "
+                    . "({$tenant->qrUsed()}/{$tenant->qrLimit()}). Upgrade paket untuk menambah QR.",
+                'code' => 'qr_limit_reached',
+                'usage' => [
+                    'qr_used' => $tenant->qrUsed(),
+                    'qr_limit' => $tenant->qrLimit(),
+                ],
+            ], 403);
+        }
+
         // Generate unique short code
         do {
             $shortCode = Str::random(6);
@@ -39,8 +56,8 @@ class QrCodeController extends Controller
             'short_code' => $shortCode,
             'color' => $validated['color'] ?? '#2563EB',
             'logo' => $validated['logo'] ?? null,
-            'tenant_id' => $request->user()->tenant_id ?? 1,
-        ]);
+            'tenant_id' => $request->user()->tenant_id,
+        ]); 
 
         return response()->json($qr, 201);
     }

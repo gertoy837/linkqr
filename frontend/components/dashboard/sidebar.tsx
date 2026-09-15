@@ -11,6 +11,7 @@ import {
   LogOut,
   PlusCircle,
   ExternalLink,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -58,6 +59,12 @@ const navItems: NavItem[] = [
     label: 'Analitik',
     icon: BarChart3,
     match: (p) => p === '/dashboard/analytics',
+  },
+  {
+    href: '/dashboard/billing',
+    label: 'Paket & Tagihan',
+    icon: CreditCard,
+    match: (p) => p === '/dashboard/billing',
   },
   {
     href: '/dashboard/settings',

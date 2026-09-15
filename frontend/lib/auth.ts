@@ -1,10 +1,21 @@
 import api from './api';
 
+export interface TenantInfo {
+  id: number;
+  name: string;
+  slug: string;
+  plan: string;
+  billing_cycle: string;
+  plan_expires_at: string | null;
+}
+
 export interface User {
   id: number;
   name: string;
   email: string;
   created_at: string;
+  tenant_id?: number;
+  tenant?: TenantInfo;
 }
 
 export interface AuthResponse {
@@ -17,8 +28,22 @@ export async function login(email: string, password: string): Promise<AuthRespon
   return response.data;
 }
 
-export async function register(name: string, email: string, password: string, password_confirmation: string): Promise<AuthResponse> {
-  const response = await api.post<AuthResponse>('/register', { name, email, password, password_confirmation });
+export async function register(
+  name: string,
+  email: string,
+  password: string,
+  password_confirmation: string,
+  plan?: string,
+  billing_cycle?: string
+): Promise<AuthResponse> {
+  const response = await api.post<AuthResponse>('/register', {
+    name,
+    email,
+    password,
+    password_confirmation,
+    ...(plan ? { plan } : {}),
+    ...(billing_cycle ? { billing_cycle } : {}),
+  });
   return response.data;
 }
 

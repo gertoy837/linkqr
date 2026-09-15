@@ -442,7 +442,7 @@ export default function HomePage() {
                     ))}
                   </ul>
                 </div>
-                <Link href="/register" className="mt-8 block">
+                <Link href="/register?plan=starter" className="mt-8 block">
                   <Button variant="outline" className="w-full border-neutral-300 text-neutral-800 hover:bg-neutral-50">
                     Mulai Gratis
                   </Button>
@@ -477,7 +477,10 @@ export default function HomePage() {
                     ))}
                   </ul>
                 </div>
-                <Link href="/register" className="mt-8 block">
+                <Link
+                  href={`/register?plan=business_pro&cycle=${billingCycle}`}
+                  className="mt-8 block"
+                >
                   <Button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold border-0 shadow-md">
                     Pilih Paket Pro
                   </Button>
@@ -505,7 +508,7 @@ export default function HomePage() {
                     ))}
                   </ul>
                 </div>
-                <Link href="/register" className="mt-8 block">
+                <Link href="/register?plan=enterprise" className="mt-8 block">
                   <Button variant="outline" className="w-full border-neutral-300 text-neutral-800 hover:bg-neutral-50">
                     Hubungi Tim
                   </Button>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\RedirectController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Aggregated analytics - must be declared before the qr-codes resource
     // so it is not swallowed by /qr-codes/{qrCode}.
     Route::get('/analytics/summary', [AnalyticsController::class, 'summary']);
+
+    // Plans & billing
+    Route::get('/plan', [PlanController::class, 'show']);
+    Route::post('/plan/select', [PlanController::class, 'select']);
 
     // QR Codes
     Route::apiResource('qr-codes', QrCodeController::class)->except(['create', 'edit']);
