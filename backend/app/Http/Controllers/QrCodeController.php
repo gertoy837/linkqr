@@ -7,9 +7,12 @@ use App\Models\QrScanLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class QrCodeController extends Controller
 {
+    use AuthorizesRequests;
+
     public function index(Request $request)
     {
         $qrs = $request->user()->qrCodes()->latest()->get();
