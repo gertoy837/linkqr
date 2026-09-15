@@ -19,7 +19,7 @@ class RedirectController extends Controller
         // Log scan
         $log = new QrScanLog([
             'qr_code_id' => $qr->id,
-            'ip_address' => $request->ip(),
+            'ip_address' => $request->header('X-Real-IP') ?: $request->ip(),
             'user_agent' => $request->userAgent(),
             'referer' => $request->header('referer'),
             'scanned_at' => now(),
