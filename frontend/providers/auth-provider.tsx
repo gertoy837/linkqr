@@ -1,7 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, login as apiLogin, register as apiRegister, logout as apiLogout, getToken, getUser, setAuth, isAuthenticated } from '@/lib/auth';
+import api from '@/lib/api';
+import { User, login as apiLogin, register as apiRegister, logout as apiLogout, getToken, getUser, setAuth, clearAuth } from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -28,12 +29,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const t = getToken();
-    const u = getUser();
-    if (t && u) {
+    const cached = getUser();
+
+    // Show the cached user immediately so the shell does not flash a spinner.
+    if (t && cached) {
       setToken(t);
-      setUser(u);
+      setUser(cached);
     }
-    setIsLoading(false);
+
+    if (!t) {
+      setIsLoading(false);
+      return;
+    }
+
+    // Then reconcile with the server. localStorage and the `role` cookie can
+    // both be stale: an admin can be demoted, a plan can expire, an account
+    // can be deleted. Without this refresh the UI kept showing the old role
+    // (stale "Console Admin" menu, redirects to /admin) until a manual logout.
+    let cancelled = false;
+
+    api
+      .get<User>('/user')
+      .then((res) => {
+        if (cancelled) return;
+        // setAuth also rewrites the `role` cookie, so the middleware stops
+        // treating a demoted admin as an admin on the next /login visit.
+        setAuth(t, res.data);
+        setToken(t);
+        setUser(res.data);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Token rejected — drop everything so the middleware bounces to /login.
+        clearAuth();
+        setToken(null);
+        setUser(null);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -76,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth must be used within a AuthProvider');
   }
   return context;
 }
