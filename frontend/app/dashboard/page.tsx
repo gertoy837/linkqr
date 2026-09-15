@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/providers/auth-provider';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,15 +10,14 @@ import {
   MousePointerClick,
   Clock,
   TrendingUp,
+  TrendingDown,
+  Users,
   Plus,
   ArrowRight,
   BarChart3,
-  Link2,
   Zap,
   Sparkles,
   CheckCircle2,
-  Globe,
-  Smartphone
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -30,39 +29,76 @@ interface QrItem {
   created_at: string;
 }
 
+/**
+ * Semua angka di sini datang dari /analytics/summary — endpoint yang sama
+ * dipakai halaman Analitik. Jangan pernah hitung ulang dari jumlah QR:
+ * itu bikin dashboard dan halaman Analitik menampilkan angka yang berbeda.
+ */
 interface Stats {
   total_qr: number;
+  active_qr: number;
   total_scans: number;
   today_scans: number;
+  unique_visitors: number;
   growth: number;
+  window_scans: number;
+  days: number;
 }
+
+const RANGE_DAYS = 30;
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentQr, setRecentQr] = useState<QrItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const qrRes = await api.get('/qr-codes');
-        const qrs: QrItem[] = qrRes.data || [];
-        setRecentQr(qrs.slice(0, 5));
-        setStats({
-          total_qr: qrs.length,
-          total_scans: qrs.length * 14, // demo count or calculate
-          today_scans: Math.min(qrs.length * 3, 12),
-          growth: qrs.length > 0 ? 12.5 : 0,
-        });
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchStats();
+  const fetchStats = useCallback(async (background = false) => {
+    if (!background) setLoading(true);
+    try {
+      const [qrRes, summaryRes] = await Promise.all([
+        api.get('/qr-codes'),
+        api.get('/analytics/summary', { params: { days: RANGE_DAYS } }),
+      ]);
+
+      const qrs: QrItem[] = qrRes.data || [];
+      const s = summaryRes.data || {};
+
+      setRecentQr(qrs.slice(0, 5));
+      setStats({
+        total_qr: qrs.length,
+        active_qr: s.active_qr ?? qrs.length,
+        total_scans: s.total_scans ?? 0,
+        today_scans: s.scans_today ?? 0,
+        unique_visitors: s.unique_visitors ?? 0,
+        growth: s.growth ?? 0,
+        window_scans: s.scans_window ?? 0,
+        days: s.days ?? RANGE_DAYS,
+      });
+      setLastUpdated(new Date());
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Muat awal
+  useEffect(() => {
+    fetchStats();
+  }, [fetchStats]);
+
+  // Ikut live seperti halaman Analitik: polling 15 detik + refetch saat tab aktif
+  useEffect(() => {
+    const id = setInterval(() => fetchStats(true), 15000);
+    const onFocus = () => fetchStats(true);
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchStats]);
 
   if (loading) {
     return (
@@ -75,6 +111,9 @@ export default function DashboardPage() {
     );
   }
 
+  const growth = stats?.growth ?? 0;
+  const growthUp = growth >= 0;
+
   const statItems = [
     {
       label: 'Total QR Code',
@@ -82,7 +121,8 @@ export default function DashboardPage() {
       icon: QrCode,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50 border-indigo-100',
-      badge: '+2 bulan ini',
+      badge: `${stats?.active_qr ?? 0} aktif`,
+      badgeTone: 'neutral' as const,
     },
     {
       label: 'Total Scan All-Time',
@@ -91,6 +131,7 @@ export default function DashboardPage() {
       color: 'text-blue-600',
       bg: 'bg-blue-50 border-blue-100',
       badge: 'Live Tracking',
+      badgeTone: 'neutral' as const,
     },
     {
       label: 'Scan Hari Ini',
@@ -99,14 +140,16 @@ export default function DashboardPage() {
       color: 'text-amber-600',
       bg: 'bg-amber-50 border-amber-100',
       badge: 'Hari Ini',
+      badgeTone: 'neutral' as const,
     },
     {
-      label: 'Konversi Klik',
-      value: `${stats?.growth ?? 0}%`,
-      icon: TrendingUp,
+      label: `Pengunjung Unik (${stats?.days ?? RANGE_DAYS}h)`,
+      value: stats?.unique_visitors ?? 0,
+      icon: Users,
       color: 'text-emerald-600',
       bg: 'bg-emerald-50 border-emerald-100',
-      badge: '+4.2% minggu ini',
+      badge: `${growthUp ? '+' : ''}${growth}% vs periode lalu`,
+      badgeTone: growthUp ? ('up' as const) : ('down' as const),
     },
   ];
 
@@ -126,6 +169,12 @@ export default function DashboardPage() {
             </h1>
             <p className="text-indigo-200/80 text-sm max-w-xl leading-relaxed">
               Pantau performa QR code dinamis dan link pendekmu dari satu dashboard terpusat.
+              {lastUpdated && (
+                <span className="text-indigo-300/60">
+                  {' '}
+                  · Diperbarui {lastUpdated.toLocaleTimeString('id-ID')}
+                </span>
+              )}
             </p>
           </div>
           <Link href="/dashboard/qr-codes/new">
@@ -152,11 +201,19 @@ export default function DashboardPage() {
                     <Icon className={`h-4 w-4 ${item.color}`} />
                   </div>
                 </div>
-                <div className="mt-3 flex items-baseline justify-between">
+                <div className="mt-3 flex items-baseline justify-between gap-2">
                   <span className="text-3xl font-extrabold text-neutral-900 tracking-tight">
                     {item.value}
                   </span>
-                  <span className="text-[10px] font-semibold text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full">
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${
+                      item.badgeTone === 'up'
+                        ? 'text-emerald-700 bg-emerald-50'
+                        : item.badgeTone === 'down'
+                          ? 'text-red-700 bg-red-50'
+                          : 'text-neutral-500 bg-neutral-100'
+                    }`}
+                  >
                     {item.badge}
                   </span>
                 </div>
@@ -164,6 +221,33 @@ export default function DashboardPage() {
             </Card>
           );
         })}
+      </div>
+
+      {/* Ringkasan periode + link ke analitik lengkap */}
+      <div className="flex items-center justify-between rounded-2xl border border-neutral-200/80 bg-white px-5 py-4 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+            {growthUp ? (
+              <TrendingUp className="h-4 w-4 text-indigo-600" />
+            ) : (
+              <TrendingDown className="h-4 w-4 text-red-600" />
+            )}
+          </div>
+          <div>
+            <p className="text-xs font-bold text-neutral-900">
+              {stats?.window_scans ?? 0} scan dalam {stats?.days ?? RANGE_DAYS} hari terakhir
+            </p>
+            <p className="text-[11px] text-neutral-500">
+              Angka ini sama dengan yang tampil di halaman Analitik.
+            </p>
+          </div>
+        </div>
+        <Link href="/dashboard/analytics">
+          <Button variant="outline" size="sm" className="rounded-xl h-8 text-xs font-semibold gap-1.5 hover:border-indigo-200 hover:text-indigo-600">
+            Analitik Lengkap
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </Link>
       </div>
 
       {/* Main Grid: Recent QR + Quick Actions */}
