@@ -64,6 +64,21 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <ShieldCheck className="h-3 w-3" />
               Admin Console
             </span>
+
+            <nav className="hidden md:flex items-center gap-1 ml-2">
+              <Link
+                href="/admin"
+                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+              >
+                Invoice
+              </Link>
+              <Link
+                href="/admin/tenants"
+                className="px-3 py-1.5 rounded-lg text-[11px] font-semibold text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 transition-colors"
+              >
+                Workspace
+              </Link>
+            </nav>
           </div>
 
           <div className="flex items-center gap-2">

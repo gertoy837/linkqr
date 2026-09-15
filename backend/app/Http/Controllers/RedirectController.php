@@ -12,10 +12,16 @@ class RedirectController extends Controller
 {
     public function redirect(Request $request, string $shortCode)
     {
-        $qr = QrCode::where('short_code', $shortCode)->first();
+        $qr = QrCode::with('tenant')->where('short_code', $shortCode)->first();
 
         if (!$qr || !$qr->is_active) {
             abort(404, 'Link not found or inactive.');
+        }
+
+        // Workspace yang dinonaktifkan berhenti melayani redirect. 410 Gone,
+        // bukan 404: sumbernya jelas ada dan sengaja tidak dilayani lagi.
+        if ($qr->tenant && !$qr->tenant->is_active) {
+            abort(410, 'Workspace dinonaktifkan.');
         }
 
         $ip = RequestInspector::clientIp($request);

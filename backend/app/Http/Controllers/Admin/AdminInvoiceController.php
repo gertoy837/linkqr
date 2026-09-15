@@ -165,34 +165,7 @@ class AdminInvoiceController extends Controller
         ]);
     }
 
-    /**
-     * POST /api/admin/tenants/{tenant}/plan
-     *
-     * Manual override — for comped accounts, offline deals, or fixing a
-     * mistake without inventing an invoice.
-     */
-    public function setTenantPlan(Request $request, Tenant $tenant)
-    {
-        $validated = $request->validate([
-            'plan' => 'required|string|in:' . implode(',', array_keys(config('plans', []))),
-            'billing_cycle' => 'nullable|string|in:monthly,yearly',
-            'days' => 'nullable|integer|min:1|max:3650',
-        ]);
-
-        $tenant->plan = $validated['plan'];
-        $tenant->billing_cycle = $validated['billing_cycle'] ?? 'monthly';
-
-        if ($tenant->plan === 'starter') {
-            $tenant->plan_expires_at = null;
-        } else {
-            $tenant->plan_expires_at = now()->addDays($validated['days'] ?? 30);
-        }
-
-        $tenant->save();
-
-        return response()->json([
-            'message' => "Paket {$tenant->name} diubah ke {$tenant->planName()}.",
-            'tenant' => $tenant,
-        ]);
-    }
+    // setTenantPlan() pindah ke AdminTenantController: pengelolaan workspace
+    // adalah satu tanggung jawab tersendiri, bukan bagian dari verifikasi
+    // pembayaran. Route-nya sudah diarahkan ke sana.
 }

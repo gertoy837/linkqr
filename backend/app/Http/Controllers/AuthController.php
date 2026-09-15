@@ -75,6 +75,14 @@ class AuthController extends Controller
             ]);
         }
 
+        // Workspace yang dinonaktifkan tidak boleh dipakai lagi. Admin tetap
+        // bisa masuk: dia yang perlu mengaktifkannya kembali.
+        if (!$user->is_admin && $user->tenant && !$user->tenant->is_active) {
+            throw ValidationException::withMessages([
+                'email' => ['Workspace akun ini sedang dinonaktifkan. Hubungi admin untuk mengaktifkan kembali.'],
+            ]);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
 
         return response()->json([

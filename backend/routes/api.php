@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\AdminInvoiceController;
+use App\Http\Controllers\Admin\AdminTenantController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InvoiceController;
@@ -47,7 +48,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/invoices/{invoice}', [AdminInvoiceController::class, 'show']);
         Route::post('/invoices/{invoice}/verify', [AdminInvoiceController::class, 'verify']);
         Route::post('/invoices/{invoice}/reject', [AdminInvoiceController::class, 'reject']);
-        Route::post('/tenants/{tenant}/plan', [AdminInvoiceController::class, 'setTenantPlan']);
+
+        // Workspace management
+        Route::get('/tenants', [AdminTenantController::class, 'index']);
+        Route::get('/tenants/{tenant}', [AdminTenantController::class, 'show']);
+        Route::get('/tenants/{tenant}/invoices', [AdminTenantController::class, 'invoices']);
+        Route::post('/tenants/{tenant}/plan', [AdminTenantController::class, 'setPlan']);
+        Route::post('/tenants/{tenant}/extend', [AdminTenantController::class, 'extend']);
+        Route::post('/tenants/{tenant}/suspend', [AdminTenantController::class, 'suspend']);
+        Route::post('/tenants/{tenant}/activate', [AdminTenantController::class, 'activate']);
     });
 
     // QR Codes
