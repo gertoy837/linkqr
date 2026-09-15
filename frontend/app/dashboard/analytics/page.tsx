@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { ExportMenu } from '@/components/dashboard/export-menu';
 import {
   BarChart3,
   MousePointerClick,
@@ -19,6 +20,7 @@ import {
   Bot,
   MapPin,
   Clock,
+  Download,
 } from 'lucide-react';
 
 interface Bucket {
@@ -107,15 +109,28 @@ export default function AnalyticsPage() {
   const [days, setDays] = useState(30);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  // Dibaca dari /plan supaya tombol Export bisa menampilkan dialog unduhan
+  // untuk paket Pro, atau ajakan upgrade untuk Starter. Server tetap penjaga
+  // sesungguhnya lewat middleware feature:export.
+  const [canExport, setCanExport] = useState(false);
 
   const fetchAnalytics = useCallback(
     async (background = false) => {
       if (background) setRefreshing(true);
       try {
-        const res = await api.get<AnalyticsSummary>('/analytics/summary', {
-          params: { days },
-        });
+        const [res, planRes] = await Promise.all([
+          api.get<AnalyticsSummary>('/analytics/summary', { params: { days } }),
+          // Kegagalan /plan tidak boleh menggagalkan analitik — cukup bikin
+          // tombol export bersikap konservatif (terkunci).
+          api.get('/plan').catch(() => null),
+        ]);
         setData(res.data);
+        const plan = planRes?.data?.current;
+        setCanExport(
+          !!plan &&
+            (plan.plan === 'business_pro' || plan.plan === 'enterprise')
+        );
         setLastUpdated(new Date());
         setError(null);
       } catch (err: any) {
@@ -252,6 +267,14 @@ export default function AnalyticsPage() {
             <RefreshCw
               className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`}
             />
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setExportOpen(true)}
+            className="h-9 rounded-xl gap-1.5 text-xs font-semibold border-neutral-200 px-3"
+          >
+            <Download className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Ekspor</span>
           </Button>
         </div>
       </div>
@@ -477,6 +500,12 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <ExportMenu
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        featureEnabled={canExport}
+      />
     </div>
   );
 }

@@ -19,6 +19,15 @@ return [
             'qr_codes' => 5,
             'scans_per_month' => 1000,
         ],
+        // Flag ini yang benar-benar ditegakkan di server (middleware
+        // feature:export, AuthenticateApiKey). Daftar 'features' di bawah
+        // hanya teks pemasaran untuk halaman harga.
+        'features_enabled' => [
+            'export' => false,
+            'api_access' => false,
+            'custom_domain' => false,
+            'logo_branding' => false,
+        ],
         'features' => [
             '5 QR Code Dinamis',
             '1.000 Scan per bulan',
@@ -37,6 +46,12 @@ return [
         'limits' => [
             'qr_codes' => null,
             'scans_per_month' => null,
+        ],
+        'features_enabled' => [
+            'export' => true,
+            'api_access' => false,
+            'custom_domain' => false,
+            'logo_branding' => true,
         ],
         'features' => [
             'Unlimited QR Code Dinamis',
@@ -58,6 +73,12 @@ return [
         'limits' => [
             'qr_codes' => null,
             'scans_per_month' => null,
+        ],
+        'features_enabled' => [
+            'export' => true,
+            'api_access' => true,
+            'custom_domain' => true,
+            'logo_branding' => true,
         ],
         'features' => [
             'Semua Fitur Pro',

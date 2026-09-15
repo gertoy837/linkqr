@@ -3,11 +3,15 @@
 use App\Http\Controllers\Admin\AdminInvoiceController;
 use App\Http\Controllers\Admin\AdminTenantController;
 use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\Api\V1\QrCodeApiController;
+use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\RedirectController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // Health check
@@ -62,4 +66,36 @@ Route::middleware('auth:sanctum')->group(function () {
     // QR Codes
     Route::apiResource('qr-codes', QrCodeController::class)->except(['create', 'edit']);
     Route::get('/qr-codes/{qrCode}/stats', [QrCodeController::class, 'stats']);
+
+    // Export laporan (paket Pro ke atas)
+    Route::middleware('feature:export')->group(function () {
+        Route::get('/export/analytics', [ExportController::class, 'analytics']);
+        Route::get('/export/qr-codes', [ExportController::class, 'qrCodes']);
+    });
+
+    // API keys (paket Enterprise)
+    Route::get('/api-keys', [ApiKeyController::class, 'index']);
+    Route::post('/api-keys', [ApiKeyController::class, 'store']);
+    Route::post('/api-keys/{apiKey}/toggle', [ApiKeyController::class, 'toggle']);
+    Route::delete('/api-keys/{apiKey}', [ApiKeyController::class, 'destroy']);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Public API v1 — autentikasi lewat X-API-Key (paket Enterprise)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('api.key')->prefix('v1')->group(function () {
+    Route::get('/qr-codes', [QrCodeApiController::class, 'index']);
+    Route::post('/qr-codes', [QrCodeApiController::class, 'store']);
+    Route::get('/qr-codes/{shortCode}', [QrCodeApiController::class, 'show']);
+    Route::get('/qr-codes/{shortCode}/stats', [QrCodeApiController::class, 'stats']);
+    Route::get('/me', function (Request $request) {
+        $key = $request->attributes->get('api_key');
+        return response()->json([
+            'workspace' => $key->tenant->only(['id', 'name', 'slug', 'plan']),
+            'key_name' => $key->name,
+            'last_used_at' => optional($key->last_used_at)->toIso8601String(),
+        ]);
+    });
 });

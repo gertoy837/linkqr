@@ -13,6 +13,7 @@ import {
   ExternalLink,
   CreditCard,
   ShieldCheck,
+  Key,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -68,9 +69,16 @@ const navItems: NavItem[] = [
     match: (p) => p === '/dashboard/billing',
   },
   {
+    href: '/dashboard/settings/api-keys',
+    label: 'API Keys',
+    icon: Key,
+    match: (p) => p === '/dashboard/settings/api-keys',
+  },
+  {
     href: '/dashboard/settings',
     label: 'Pengaturan',
     icon: Settings,
+    // Jangan nyala saat berada di sub-halaman API Keys yang punya entri sendiri.
     match: (p) => p === '/dashboard/settings',
   },
 ];

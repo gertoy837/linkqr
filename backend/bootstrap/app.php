@@ -15,6 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'api.key' => \App\Http\Middleware\AuthenticateApiKey::class,
+            'feature' => \App\Http\Middleware\EnsurePlanFeature::class,
         ]);
 
         // API-only backend: never try to redirect a guest to a web login route.

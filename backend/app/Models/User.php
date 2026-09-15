@@ -54,6 +54,11 @@ class User extends Authenticatable
         return $this->hasMany(Invoice::class);
     }
 
+    public function apiKeys(): HasMany
+    {
+        return $this->hasMany(ApiKey::class);
+    }
+
     // ---------------------------------------------------------------------
     // Plan helpers (per-user)
     //
