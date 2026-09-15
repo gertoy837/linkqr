@@ -82,8 +82,14 @@ export function setAuth(token: string, user: User): void {
   // Mirror the token into a cookie as well: the Next.js middleware runs on the
   // edge and cannot read localStorage, so without this every request to
   // /dashboard gets bounced straight back to /login even after a successful login.
+  //
+  // `role` rides along for the same reason. It lets the middleware send an
+  // already-signed-in admin to /admin instead of the customer dashboard, and
+  // it is only a routing hint — the API re-checks `is_admin` on every admin
+  // request, so a tampered cookie grants nothing.
   if (typeof document !== 'undefined') {
     document.cookie = `token=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+    document.cookie = `role=${user.is_admin ? 'admin' : 'user'}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
   }
 }
 
@@ -92,6 +98,7 @@ export function clearAuth(): void {
   localStorage.removeItem('user');
   if (typeof document !== 'undefined') {
     document.cookie = 'token=; path=/; max-age=0; SameSite=Lax';
+    document.cookie = 'role=; path=/; max-age=0; SameSite=Lax';
   }
 }
 

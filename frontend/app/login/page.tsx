@@ -23,9 +23,16 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      await login(email, password);
-      toast({ title: 'Berhasil masuk', description: 'Selamat datang kembali!' });
-      router.push('/dashboard');
+      const signedIn = await login(email, password);
+      toast({
+        title: 'Berhasil masuk',
+        description: signedIn.is_admin
+          ? 'Masuk sebagai administrator.'
+          : 'Selamat datang kembali!',
+      });
+      // Admin accounts belong in the operator console, not the customer
+      // dashboard. Regular users are unaffected.
+      router.push(signedIn.is_admin ? '/admin' : '/dashboard');
     } catch (err: any) {
       const msg = err.response?.data?.message || 'Email atau password salah.';
       toast({ title: 'Gagal masuk', description: msg, variant: 'destructive' });
