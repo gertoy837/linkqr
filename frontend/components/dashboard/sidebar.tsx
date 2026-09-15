@@ -3,16 +3,68 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
-import { QrCode, LayoutDashboard, BarChart3, Settings, LogOut, PlusCircle, Sparkles, ExternalLink } from 'lucide-react';
+import {
+  QrCode,
+  LayoutDashboard,
+  BarChart3,
+  Settings,
+  LogOut,
+  PlusCircle,
+  ExternalLink,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/dashboard/qr-codes', label: 'QR Codes', icon: QrCode },
-  { href: '/dashboard/qr-codes/new', label: 'Buat QR Baru', icon: PlusCircle },
-  { href: '/dashboard/analytics', label: 'Analitik', icon: BarChart3 },
-  { href: '/dashboard/settings', label: 'Pengaturan', icon: Settings },
+/**
+ * Each item declares exactly how it matches the current path, so two menu
+ * entries can never be highlighted at the same time:
+ *  - 'exact'  → only this exact path
+ *  - 'prefix' → this path and its children, minus the excluded ones
+ */
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof QrCode;
+  match: (pathname: string) => boolean;
+  badge?: string;
+};
+
+const navItems: NavItem[] = [
+  {
+    href: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    match: (p) => p === '/dashboard',
+  },
+  {
+    href: '/dashboard/qr-codes',
+    label: 'QR Codes',
+    icon: QrCode,
+    // Matches the list AND detail pages (/dashboard/qr-codes/12),
+    // but NOT the create page which has its own entry below.
+    match: (p) =>
+      p === '/dashboard/qr-codes' ||
+      (p.startsWith('/dashboard/qr-codes/') && p !== '/dashboard/qr-codes/new'),
+  },
+  {
+    href: '/dashboard/qr-codes/new',
+    label: 'Buat QR Baru',
+    icon: PlusCircle,
+    match: (p) => p === '/dashboard/qr-codes/new',
+    badge: 'Baru',
+  },
+  {
+    href: '/dashboard/analytics',
+    label: 'Analitik',
+    icon: BarChart3,
+    match: (p) => p === '/dashboard/analytics',
+  },
+  {
+    href: '/dashboard/settings',
+    label: 'Pengaturan',
+    icon: Settings,
+    match: (p) => p === '/dashboard/settings',
+  },
 ];
 
 export function DashboardSidebar() {
@@ -37,34 +89,59 @@ export function DashboardSidebar() {
             <span className="text-lg font-bold text-neutral-900 tracking-tight leading-none">
               Link<span className="text-indigo-600">QR</span>
             </span>
-            <span className="text-[10px] text-neutral-400 mt-1 font-medium">Dashboard Suite</span>
+            <span className="text-[10px] text-neutral-400 mt-1 font-medium">
+              Dashboard Suite
+            </span>
           </div>
         </Link>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-5 space-y-1">
+      <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
         <div className="px-3 pb-2 text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
           Menu Utama
         </div>
+
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+          const isActive = item.match(pathname);
+
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? 'page' : undefined}
               className={cn(
-                'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150',
+                'group relative flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm transition-all duration-150',
                 isActive
-                  ? 'bg-indigo-50 text-indigo-700 font-semibold shadow-xs border border-indigo-100/80'
-                  : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
+                  ? 'bg-indigo-50 text-indigo-700 font-semibold border border-indigo-100/80 shadow-xs'
+                  : 'text-neutral-600 font-medium hover:bg-neutral-50 hover:text-neutral-900'
               )}
             >
-              <Icon className={cn('h-4 w-4 transition-colors', isActive ? 'text-indigo-600' : 'text-neutral-400')} />
-              <span>{item.label}</span>
+              {/* Active left rail */}
+              <span
+                className={cn(
+                  'absolute left-0 top-1/2 -translate-y-1/2 w-[3px] rounded-r-full bg-indigo-600 transition-all duration-200',
+                  isActive ? 'h-5 opacity-100' : 'h-0 opacity-0'
+                )}
+              />
+              <Icon
+                className={cn(
+                  'h-4 w-4 shrink-0 transition-colors',
+                  isActive
+                    ? 'text-indigo-600'
+                    : 'text-neutral-400 group-hover:text-neutral-600'
+                )}
+              />
+              <span className="truncate">{item.label}</span>
+
+              {item.badge && !isActive && (
+                <span className="ml-auto shrink-0 rounded-md bg-neutral-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-neutral-500 group-hover:bg-indigo-50 group-hover:text-indigo-600">
+                  {item.badge}
+                </span>
+              )}
               {isActive && (
-                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
               )}
             </Link>
           );
@@ -76,9 +153,9 @@ export function DashboardSidebar() {
         <Link
           href="/"
           target="_blank"
-          className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
+          className="group flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900 transition-colors"
         >
-          <ExternalLink className="h-4 w-4 text-neutral-400" />
+          <ExternalLink className="h-4 w-4 text-neutral-400 group-hover:text-neutral-600" />
           <span>Lihat Landing Page</span>
         </Link>
       </nav>
@@ -90,8 +167,12 @@ export function DashboardSidebar() {
             {user?.name?.[0]?.toUpperCase() || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-neutral-900 truncate">{user?.name || 'User'}</p>
-            <p className="text-[11px] text-neutral-500 truncate">{user?.email || 'user@example.com'}</p>
+            <p className="text-xs font-bold text-neutral-900 truncate">
+              {user?.name || 'User'}
+            </p>
+            <p className="text-[11px] text-neutral-500 truncate">
+              {user?.email || 'user@example.com'}
+            </p>
           </div>
         </div>
         <Button
