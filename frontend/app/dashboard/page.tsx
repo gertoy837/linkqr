@@ -18,6 +18,9 @@ import {
   Zap,
   Sparkles,
   CheckCircle2,
+  Crown,
+  AlertTriangle,
+  Infinity as InfinityIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -45,11 +48,31 @@ interface Stats {
   days: number;
 }
 
+interface PlanUsage {
+  qr_used: number;
+  qr_limit: number | null;
+  qr_remaining: number | null;
+  scans_used: number;
+  scan_limit: number | null;
+  scan_remaining: number | null;
+  over_scan_limit: boolean;
+}
+
+interface CurrentPlan {
+  plan: string;
+  plan_name: string;
+  billing_cycle: string;
+  plan_expires_at: string | null;
+  is_expired: boolean;
+  usage: PlanUsage;
+}
+
 const RANGE_DAYS = 30;
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [plan, setPlan] = useState<CurrentPlan | null>(null);
   const [recentQr, setRecentQr] = useState<QrItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -57,9 +80,10 @@ export default function DashboardPage() {
   const fetchStats = useCallback(async (background = false) => {
     if (!background) setLoading(true);
     try {
-      const [qrRes, summaryRes] = await Promise.all([
+      const [qrRes, summaryRes, planRes] = await Promise.all([
         api.get('/qr-codes'),
         api.get('/analytics/summary', { params: { days: RANGE_DAYS } }),
+        api.get('/plan'),
       ]);
 
       const qrs: QrItem[] = qrRes.data || [];
@@ -76,6 +100,7 @@ export default function DashboardPage() {
         window_scans: s.scans_window ?? 0,
         days: s.days ?? RANGE_DAYS,
       });
+      setPlan(planRes.data?.current ?? null);
       setLastUpdated(new Date());
     } catch (err) {
       console.error(err);
@@ -114,6 +139,27 @@ export default function DashboardPage() {
   const growth = stats?.growth ?? 0;
   const growthUp = growth >= 0;
 
+  const usage = plan?.usage;
+  const isPaid = plan && plan.plan !== 'starter';
+
+  // Extract to non-optional locals: TS cannot narrow `usage?.x` inside the
+  // JSX ternaries below, which produced "possibly undefined" build errors.
+  const qrUsed = usage?.qr_used ?? 0;
+  const qrLimit = usage?.qr_limit ?? null;
+  const qrRemaining = usage?.qr_remaining ?? 0;
+  const scansUsed = usage?.scans_used ?? 0;
+  const scanLimit = usage?.scan_limit ?? null;
+
+  const qrAtLimit = qrLimit !== null && qrUsed >= qrLimit;
+  const scanAtLimit = usage?.over_scan_limit ?? false;
+
+  const qrPct =
+    qrLimit === null ? 100 : Math.max(2, Math.min(100, (qrUsed / qrLimit) * 100));
+  const scanPct =
+    scanLimit === null
+      ? 100
+      : Math.max(2, Math.min(100, (scansUsed / scanLimit) * 100));
+
   const statItems = [
     {
       label: 'Total QR Code',
@@ -121,8 +167,8 @@ export default function DashboardPage() {
       icon: QrCode,
       color: 'text-indigo-600',
       bg: 'bg-indigo-50 border-indigo-100',
-      badge: `${stats?.active_qr ?? 0} aktif`,
-      badgeTone: 'neutral' as const,
+      badge: qrLimit !== null ? `${qrUsed}/${qrLimit} kuota` : 'Tanpa batas',
+      badgeTone: qrAtLimit ? ('down' as const) : ('neutral' as const),
     },
     {
       label: 'Total Scan All-Time',
@@ -161,8 +207,15 @@ export default function DashboardPage() {
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-400/30 text-xs font-semibold text-indigo-200">
-              <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
-              <span>LinkQR Pro Active Plan</span>
+              {isPaid ? (
+                <Crown className="h-3.5 w-3.5 text-amber-300" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5 text-indigo-300" />
+              )}
+              <span>
+                {plan?.plan_name ?? 'Starter'} Plan
+                {plan?.billing_cycle === 'yearly' ? ' · Tahunan' : ''}
+              </span>
             </div>
             <h1 className="text-3xl font-bold tracking-tight">
               Selamat Datang Kembali, {user?.name || 'User'}! 👋
@@ -185,6 +238,49 @@ export default function DashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* Plan quota warning */}
+      {plan?.is_expired && (
+        <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-red-600" />
+          <div className="flex-1">
+            <p className="text-sm font-bold text-red-900">
+              Paket {plan.plan_name} sudah kedaluwarsa
+            </p>
+            <p className="text-xs mt-1 text-red-700">
+              Perbarui paket untuk tetap mendapat fitur penuh. QR yang sudah ada tetap berjalan.
+            </p>
+          </div>
+          <Link href="/dashboard/billing" className="shrink-0">
+            <Button size="sm" className="rounded-xl h-8 text-xs font-semibold border-0 bg-red-600 hover:bg-red-700 text-white">
+              Perbarui
+            </Button>
+          </Link>
+        </div>
+      )}
+
+      {!plan?.is_expired && (qrAtLimit || scanAtLimit) && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+          <AlertTriangle className="h-5 w-5 shrink-0 mt-0.5 text-amber-600" />
+          <div className="flex-1">
+            <p className="text-sm font-bold text-amber-900">
+              {qrAtLimit
+                ? `Kuota QR paket ${plan?.plan_name} sudah penuh (${usage?.qr_used}/${usage?.qr_limit})`
+                : `Scan bulan ini melebihi kuota (${usage?.scans_used}/${usage?.scan_limit})`}
+            </p>
+            <p className="text-xs mt-1 text-amber-700">
+              {qrAtLimit
+                ? 'Upgrade paket untuk membuat QR baru. QR yang sudah ada tetap berjalan normal.'
+                : 'QR tetap berjalan normal — pertimbangkan upgrade agar tidak ada batasan.'}
+            </p>
+          </div>
+          <Link href="/dashboard/billing" className="shrink-0">
+            <Button size="sm" className="rounded-xl h-8 text-xs font-semibold border-0 bg-amber-600 hover:bg-amber-700 text-white">
+              Lihat Paket
+            </Button>
+          </Link>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -320,8 +416,117 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Right: Quick Actions & Status */}
+        {/* Right: Plan Usage + Quick Actions */}
         <div className="space-y-6">
+          {/* Plan & quota card */}
+          {plan && (
+            <Card className="border border-neutral-200/80 shadow-xs rounded-2xl bg-white overflow-hidden">
+              <CardHeader className="pb-3 border-b border-neutral-100">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base font-bold text-neutral-900 flex items-center gap-2">
+                    {isPaid ? (
+                      <Crown className="h-4 w-4 text-amber-500" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 text-indigo-600" />
+                    )}
+                    Pemakaian Paket
+                  </CardTitle>
+                  <Link href="/dashboard/billing">
+                    <Button variant="ghost" size="sm" className="text-[11px] text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 font-semibold h-7 px-2 rounded-lg">
+                      Kelola
+                    </Button>
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-4">
+                {/* QR quota */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-600">
+                      <QrCode className="h-3 w-3 text-neutral-400" />
+                      Kuota QR
+                    </span>
+                    <span className="text-[11px] font-bold text-neutral-900 tabular-nums">
+                      {qrUsed}
+                      <span className="text-neutral-400">
+                        /{qrLimit ?? '∞'}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-neutral-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        qrLimit === null
+                          ? 'bg-indigo-400'
+                          : qrAtLimit
+                            ? 'bg-red-500'
+                            : qrUsed / qrLimit >= 0.8
+                              ? 'bg-amber-500'
+                              : 'bg-indigo-500'
+                      }`}
+                      style={{ width: `${qrPct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Scan quota */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-neutral-600">
+                      <MousePointerClick className="h-3 w-3 text-neutral-400" />
+                      Scan Bulan Ini
+                    </span>
+                    <span className="text-[11px] font-bold text-neutral-900 tabular-nums">
+                      {scansUsed}
+                      <span className="text-neutral-400">
+                        /{scanLimit ?? '∞'}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-neutral-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        scanLimit === null
+                          ? 'bg-emerald-400'
+                          : scanAtLimit
+                            ? 'bg-red-500'
+                            : scansUsed / scanLimit >= 0.8
+                              ? 'bg-amber-500'
+                              : 'bg-emerald-500'
+                      }`}
+                      style={{ width: `${scanPct}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Plan meta */}
+                <div className="pt-3 border-t border-neutral-100 flex items-center justify-between">
+                  <span className="text-[11px] text-neutral-500">
+                    {plan.billing_cycle === 'yearly' ? 'Siklus tahunan' : 'Siklus bulanan'}
+                  </span>
+                  {qrLimit === null && scanLimit === null ? (
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-600">
+                      <InfinityIcon className="h-3 w-3" /> Unlimited
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-semibold text-neutral-700">
+                      {qrRemaining} QR tersisa
+                    </span>
+                  )}
+                </div>
+
+                {plan.plan === 'starter' && (
+                  <Link href="/dashboard/billing" className="block">
+                    <Button className="w-full h-9 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold gap-1.5 shadow-sm shadow-indigo-500/20 border-0">
+                      <Crown className="h-3.5 w-3.5" />
+                      Upgrade ke Pro
+                    </Button>
+                  </Link>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="border border-neutral-200/80 shadow-xs rounded-2xl bg-white">
             <CardHeader className="pb-3 border-b border-neutral-100">
               <CardTitle className="text-base font-bold text-neutral-900">
