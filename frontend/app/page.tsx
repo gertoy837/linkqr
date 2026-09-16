@@ -579,6 +579,20 @@ export default function HomePage() {
             </div>
             <span className="font-bold text-neutral-900">LinkQR</span>
           </div>
+          <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs">
+            <Link href="/terms" className="hover:text-neutral-900 transition-colors">
+              Syarat &amp; Ketentuan
+            </Link>
+            <Link href="/privacy" className="hover:text-neutral-900 transition-colors">
+              Kebijakan Privasi
+            </Link>
+            <a
+              href="mailto:support@kovarastudio.id"
+              className="hover:text-neutral-900 transition-colors"
+            >
+              Kontak
+            </a>
+          </nav>
           <p className="text-xs">&copy; {new Date().getFullYear()} LinkQR — Dibuat dengan ❤️ oleh Kovara Studio</p>
         </div>
       </footer>

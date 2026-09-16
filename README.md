@@ -25,7 +25,13 @@ Solusi hemat biaya promosi untuk UMKM, Restoran, Event Organizer, dan Agency tan
 - 🎨 **Brand Customization**: Kustomisasi warna titik QR, latar belakang, dan logo bisnis di tengah QR Code.
 - 📱 **Progressive Web App (PWA)**: Dilengkapi `manifest.json`, `favicon.ico`, dan `apple-icon.png` siap diinstall ke Home Screen.
 - ⚡ **Interactive Playground**: Widget uji coba langsung di landing page tanpa perlu login.
-- 💳 **Multi-Tier Subscription Pricing**: UI Pricing 3-tier (Starter Gratis, Business Pro, Enterprise) dengan toggle diskon bulanan/tahunan.
+- 💳 **Paket Berbayar yang Benar-Benar Ditegakkan**: 3 tier (Starter / Business Pro / Enterprise) dengan kuota QR & scan yang dicek di server, bukan cuma tampilan.
+- 🧾 **Pembayaran QRIS Statis**: Invoice dengan nominal unik, upload bukti transfer, verifikasi admin. Bisa terima uang **tanpa approval payment gateway**.
+- 🛡️ **Console Admin**: Verifikasi pembayaran, kelola workspace (ubah paket, perpanjang, suspend), pantau MRR/ARR.
+- 📤 **Ekspor Laporan**: PDF siap kirim ke klien & CSV untuk Excel (Business Pro ke atas).
+- 🔑 **API Developer**: REST API `/api/v1/*` dengan kunci API untuk integrasi sistem lain (Enterprise).
+- ⏰ **Auto-Downgrade Terjadwal**: Paket yang lewat masa aktif turun otomatis — tapi QR yang sudah dicetak tetap jalan.
+- 📜 **Halaman Legal & SEO**: Syarat & Ketentuan, Kebijakan Privasi, sitemap, robots, dan JSON-LD.
 
 ---
 
@@ -121,6 +127,9 @@ cp .env.example .env.local
 npm run dev
 ```
 Frontend akan berjalan di `http://localhost:3000`.
+
+> **Panduan lengkap untuk server produksi** (PM2, Cloudflare Tunnel, konfigurasi QRIS,
+> cara membuat akun admin pertama, troubleshooting) ada di **[INSTALL.md](INSTALL.md)**.
 
 ---
 
