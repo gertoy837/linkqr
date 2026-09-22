@@ -55,3 +55,7 @@ logs/
 
 # Local backups
 .backup-*/
+*.bak-audit
+.backup-audit/
+.phpunit.result.cache
+backend/.phpunit.result.cache
