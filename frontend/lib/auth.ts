@@ -7,6 +7,12 @@ export interface TenantInfo {
   plan: string;
   billing_cycle: string;
   plan_expires_at: string | null;
+  /**
+   * Flag fitur yang benar-benar ditegakkan server (bukan teks pemasaran).
+   * Dipakai untuk mengunci UI — mis. pemilih warna & logo yang hanya tersedia
+   * di paket Business Pro. Server tetap memeriksa ulang di setiap request.
+   */
+  features_enabled?: Record<string, boolean>;
 }
 
 export interface User {
@@ -128,4 +134,22 @@ export function clearAuth(): void {
 
 export function isAuthenticated(): boolean {
   return !!getToken();
+}
+
+/**
+ * Apakah user ini boleh memakai sebuah fitur berbayar?
+ *
+ * Admin selalu boleh — harus sama dengan aturan server (EnsurePlanFeature dan
+ * User::canUseFeature). Tanpa pengecualian ini, admin berpaket Starter melihat
+ * kontrolnya terkunci padahal API-nya menerima, jadi tombol yang seharusnya
+ * bisa dipakai jadi mati.
+ *
+ * Ini hanya untuk tampilan. Server tetap memeriksa ulang setiap request, jadi
+ * mengubah nilai di browser tidak memberi akses apa pun.
+ */
+export function canUseFeature(user: User | null, feature: string): boolean {
+  if (!user) return false;
+  if (user.is_admin) return true;
+
+  return !!user.tenant?.features_enabled?.[feature];
 }

@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class QrCode extends Model
 {
+    /**
+     * Warna bawaan untuk semua paket. Dipakai sebagai pembanding saat memagari
+     * fitur "Kustomisasi Warna": paket Starter boleh memakai warna ini, dan
+     * hanya warna ini.
+     */
+    public const DEFAULT_COLOR = '#2563EB';
+
     protected $fillable = [
         'user_id',
         'tenant_id',

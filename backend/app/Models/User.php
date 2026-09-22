@@ -83,6 +83,21 @@ class User extends Authenticatable
         return $this->tenant?->scanLimit();
     }
 
+    /**
+     * Apakah fitur ini tersedia untuk paket user sekarang?
+     *
+     * Admin selalu boleh — sama seperti middleware EnsurePlanFeature, supaya
+     * operator bisa menguji fitur berbayar tanpa menaikkan paketnya sendiri.
+     */
+    public function canUseFeature(string $feature): bool
+    {
+        if ($this->is_admin) {
+            return true;
+        }
+
+        return $this->tenant?->canUseFeature($feature) ?? false;
+    }
+
     public function qrUsed(): int
     {
         return $this->qrCodes()->count();

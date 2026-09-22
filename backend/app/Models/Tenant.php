@@ -23,6 +23,14 @@ class Tenant extends Model
         'plan_expires_at' => 'datetime',
     ];
 
+    /**
+     * `features_enabled` ikut di setiap serialisasi tenant supaya frontend bisa
+     * mengunci UI-nya (mis. menyembunyikan pemilih warna untuk paket Starter)
+     * tanpa perlu satu request tambahan ke /api/plan. Yang benar-benar menegak-
+     * kan aturan tetap server — lihat QrCodeController.
+     */
+    protected $appends = ['features_enabled'];
+
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
@@ -132,5 +140,21 @@ class Tenant extends Model
     public function isExpired(): bool
     {
         return $this->plan_expires_at !== null && $this->plan_expires_at->isPast();
+    }
+
+    /** Fitur yang benar-benar ditegakkan server untuk paket ini. */
+    public function featuresEnabled(): array
+    {
+        return $this->planDefinition()['features_enabled'] ?? [];
+    }
+
+    public function canUseFeature(string $feature): bool
+    {
+        return (bool) ($this->featuresEnabled()[$feature] ?? false);
+    }
+
+    public function getFeaturesEnabledAttribute(): array
+    {
+        return $this->featuresEnabled();
     }
 }

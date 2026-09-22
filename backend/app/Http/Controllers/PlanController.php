@@ -118,6 +118,9 @@ class PlanController extends Controller
                 'over_scan_limit' => $user->isOverScanLimit(),
             ],
             'features' => $tenant?->planDefinition()['features'] ?? [],
+            // Flag yang benar-benar ditegakkan server (bukan teks pemasaran),
+            // dipakai halaman QR untuk mengunci pemilih warna/logo.
+            'features_enabled' => $tenant?->featuresEnabled() ?? [],
         ];
     }
 

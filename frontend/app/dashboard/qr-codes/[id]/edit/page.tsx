@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,18 +11,16 @@ import { Label } from '@/components/ui/label';
 import {
   ArrowLeft,
   QrCode as QrIcon,
-  Sparkles,
-  Zap,
+  Save,
   CheckCircle2,
   Palette,
   Link2,
   Type,
   Info,
-  BarChart3,
-  Globe,
   ImagePlus,
   Lock,
   X,
+  Power,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/providers/auth-provider';
@@ -42,58 +40,69 @@ const PRESET_COLORS = [
 /** Warna bawaan paket gratis — harus sama dengan QrCode::DEFAULT_COLOR. */
 const DEFAULT_COLOR = '#2563EB';
 
-/** Batas ukuran file logo sebelum dikodekan, byte. */
 const MAX_LOGO_BYTES = 200 * 1024;
-
-/** Sisi terjauh logo setelah diperkecil, piksel. */
 const MAX_LOGO_DIMENSION = 1024;
 
-export default function NewQrPage() {
+interface QrDetail {
+  id: number;
+  title: string;
+  target_url: string;
+  short_code: string;
+  color: string;
+  logo: string | null;
+  is_active: boolean;
+}
+
+export default function EditQrPage() {
+  const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
   const { user } = useAuth();
+  const id = params.id as string;
 
+  const [qr, setQr] = useState<QrDetail | null>(null);
   const [title, setTitle] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [logo, setLogo] = useState<string | null>(null);
   const [logoName, setLogoName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Fitur "Kustomisasi Logo & Warna" hanya ada di paket berbayar. Server tetap
-  // menegakkan aturan ini — yang di sini hanya supaya UI-nya jujur dan tidak
-  // menawarkan sesuatu yang akan ditolak.
   const bisaKustom = canUseFeature(user, 'logo_branding');
 
-  // window is not available during SSR — resolve the origin after mount so the
-  // preview never causes a hydration mismatch.
-  const [origin, setOrigin] = useState('');
+  // Warna asli saat halaman dibuka. Dipakai untuk tahu apakah pemilih warna
+  // benar-benar disentuh — paket Starter boleh MENYIMPAN warna lamanya, tapi
+  // tidak boleh berpindah ke warna lain.
+  const [warnaAsli, setWarnaAsli] = useState(DEFAULT_COLOR);
+  const [logoAsli, setLogoAsli] = useState<string | null>(null);
+
   useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+    const fetchQr = async () => {
+      try {
+        const res = await api.get<QrDetail>(`/qr-codes/${id}`);
+        setQr(res.data);
+        setTitle(res.data.title);
+        setTargetUrl(res.data.target_url);
+        setColor(res.data.color || DEFAULT_COLOR);
+        setWarnaAsli(res.data.color || DEFAULT_COLOR);
+        setLogo(res.data.logo);
+        setLogoAsli(res.data.logo);
+        setIsActive(res.data.is_active);
+      } catch {
+        toast({ title: 'Gagal memuat QR Code', variant: 'destructive' });
+        router.push('/dashboard/qr-codes');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchQr();
+  }, [id, router, toast]);
 
-  // A short, readable placeholder slug derived from the QR name.
-  const slugPreview = useMemo(() => {
-    const base = title
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 20);
-    return base || 'preview';
-  }, [title]);
-
-  const previewValue = `${origin}/s/${slugPreview}`;
   const urlLooksValid = /^https?:\/\/.+\..+/i.test(targetUrl.trim());
 
-  /**
-   * Baca file logo jadi data URL, sekaligus perkecil kalau perlu.
-   *
-   * Diperkecil di sisi klien karena data URL ikut tersimpan di database dan
-   * ikut terkirim di setiap respons detail QR. Foto 4 MB dari ponsel akan
-   * membengkakkan keduanya, padahal di tengah QR hanya butuh beberapa ratus
-   * piksel.
-   */
   const handleLogoPick = async (file: File) => {
     if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
       toast({
@@ -128,7 +137,6 @@ export default function NewQrPage() {
       return;
     }
 
-    // Perkecil hanya kalau memang lebih besar dari batas.
     const skala = Math.min(
       1,
       MAX_LOGO_DIMENSION / Math.max(img.naturalWidth, img.naturalHeight),
@@ -144,8 +152,6 @@ export default function NewQrPage() {
 
       if (ctx) {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        // WEBP/JPEG tetap dikodekan sebagai PNG: mendukung transparansi, dan
-        // ukurannya untuk logo kecil justru lebih kecil daripada JPEG.
         hasil = canvas.toDataURL('image/png');
       }
     }
@@ -180,42 +186,63 @@ export default function NewQrPage() {
       return;
     }
 
-    setLoading(true);
+    setSaving(true);
     try {
-      // Warna hanya dikirim kalau memang berbeda dari bawaan. Tanpa ini, paket
-      // Starter yang tidak menyentuh pemilih warna tetap ikut mengirim
-      // "#2563EB" — server menolaknya sebagai percobaan memakai fitur Pro, dan
-      // pembuatan QR yang sah jadi gagal.
       const payload: Record<string, unknown> = {
         title: title.trim(),
         target_url: targetUrl.trim(),
+        is_active: isActive,
       };
 
-      if (bisaKustom && color.toUpperCase() !== DEFAULT_COLOR.toUpperCase()) {
+      // Hanya kirim warna kalau berubah. Paket Starter yang tidak menyentuh
+      // pemilih warna tidak boleh ikut mengirim nilai — server akan
+      // membacanya sebagai percobaan memakai fitur Pro.
+      if (color.toUpperCase() !== warnaAsli.toUpperCase()) {
         payload.color = color;
       }
 
-      if (bisaKustom && logo) {
+      // Logo: kirim hanya kalau berubah. Menghapus (null) selalu boleh.
+      if (logo !== logoAsli) {
         payload.logo = logo;
       }
 
-      const res = await api.post('/qr-codes', payload);
-      toast({ title: 'QR Code berhasil dibuat!' });
-      router.push(`/dashboard/qr-codes/${res.data.id}`);
+      await api.patch(`/qr-codes/${id}`, payload);
+      toast({ title: 'Perubahan disimpan!' });
+      router.push(`/dashboard/qr-codes/${id}`);
     } catch (err: any) {
       const msg =
         err.response?.data?.message ||
         Object.values(err.response?.data?.errors || {}).flat()?.[0] ||
-        'Gagal membuat QR Code';
+        'Gagal menyimpan perubahan';
       toast({ title: 'Gagal', description: String(msg), variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="flex items-center gap-3 text-neutral-500 font-medium text-sm">
+          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+          Memuat QR Code...
+        </div>
+      </div>
+    );
+  }
+
+  if (!qr) return null;
+
+  const shortUrl = typeof window !== 'undefined'
+    ? `${window.location.origin}/s/${qr.short_code}`
+    : '';
+
+  const warnaBerubah = color.toUpperCase() !== warnaAsli.toUpperCase();
+  const kunciWarna = !bisaKustom && warnaBerubah;
+
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* Breadcrumb / Header */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Button
@@ -229,42 +256,24 @@ export default function NewQrPage() {
           </Button>
           <div>
             <h1 className="text-xl font-bold text-neutral-900 tracking-tight">
-              Buat QR Code Baru
+              Edit QR Code
             </h1>
             <p className="text-xs text-neutral-500 mt-0.5">
-              QR dinamis — target URL bisa diubah kapan saja tanpa cetak ulang.
+              Link pendek <span className="font-mono">{qr.short_code}</span> tidak
+              berubah — QR yang sudah dicetak tetap berlaku.
             </p>
           </div>
         </div>
-
-        <Link href="/dashboard/qr-codes" className="hidden sm:block">
-          <Button
-            variant="outline"
-            className="gap-2 h-9 rounded-xl text-xs font-semibold border-neutral-200"
-          >
-            <QrIcon className="h-3.5 w-3.5" />
-            Daftar QR
-          </Button>
-        </Link>
       </div>
 
       <div className="grid lg:grid-cols-5 gap-6">
-        {/* ── Left: Form ─────────────────────────────────────────── */}
+        {/* Left: Form */}
         <Card className="lg:col-span-3 border border-neutral-200/80 shadow-xs rounded-2xl bg-white">
           <CardHeader className="pb-4 border-b border-neutral-100">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm shadow-indigo-500/25">
-                <Sparkles className="h-4 w-4" />
-              </div>
-              <div>
-                <CardTitle className="text-base font-bold text-neutral-900">
-                  Detail QR Code
-                </CardTitle>
-                <p className="text-xs text-neutral-500 mt-0.5">
-                  Isi dua kolom wajib, sisanya opsional.
-                </p>
-              </div>
-            </div>
+            <CardTitle className="text-base font-bold text-neutral-900 flex items-center gap-2">
+              <QrIcon className="h-4 w-4 text-indigo-600" />
+              Detail QR Code
+            </CardTitle>
           </CardHeader>
 
           <CardContent className="pt-6">
@@ -276,25 +285,16 @@ export default function NewQrPage() {
                   className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900"
                 >
                   <Type className="h-3.5 w-3.5 text-neutral-400" />
-                  Nama QR Code <span className="text-indigo-600">*</span>
+                  Nama QR Code
                 </Label>
                 <Input
                   id="title"
-                  placeholder="Contoh: Menu Resto Cabang Kemang"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   maxLength={80}
                   required
                   className="h-11 rounded-xl"
                 />
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-neutral-500">
-                    Nama internal untuk memudahkan pencarian di dashboard.
-                  </span>
-                  <span className="text-neutral-400 tabular-nums">
-                    {title.length}/80
-                  </span>
-                </div>
               </div>
 
               {/* Target URL */}
@@ -304,12 +304,11 @@ export default function NewQrPage() {
                   className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900"
                 >
                   <Link2 className="h-3.5 w-3.5 text-neutral-400" />
-                  Target URL <span className="text-indigo-600">*</span>
+                  Target URL
                 </Label>
                 <Input
                   id="target_url"
                   type="url"
-                  placeholder="https://example.com/halaman-tujuan"
                   value={targetUrl}
                   onChange={(e) => setTargetUrl(e.target.value)}
                   required
@@ -326,12 +325,44 @@ export default function NewQrPage() {
                   </p>
                 ) : (
                   <p className="text-xs text-neutral-500">
-                    Halaman yang dibuka saat QR discan — bisa diubah nanti.
+                    Halaman yang dibuka saat QR discan. QR tercetak tidak perlu
+                    diganti.
                   </p>
                 )}
               </div>
 
-              {/* Kustomisasi: warna + logo (fitur Business Pro) */}
+              {/* Status aktif */}
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-neutral-200 p-4">
+                <div className="flex items-start gap-3">
+                  <Power className="h-4 w-4 text-neutral-400 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900">
+                      QR aktif
+                    </p>
+                    <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">
+                      Kalau dimatikan, QR berhenti mengarahkan ke target (halaman
+                      akan menampilkan 404).
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isActive}
+                  onClick={() => setIsActive((v) => !v)}
+                  className={`relative shrink-0 w-11 h-6 rounded-full transition-colors ${
+                    isActive ? 'bg-indigo-600' : 'bg-neutral-300'
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                      isActive ? 'left-[22px]' : 'left-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Kustomisasi */}
               <div className="space-y-3 rounded-2xl border border-neutral-200 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <Label className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
@@ -352,21 +383,22 @@ export default function NewQrPage() {
 
                 {!bisaKustom && (
                   <p className="text-xs text-neutral-500 leading-relaxed">
-                    Paket Starter memakai warna bawaan. Upgrade ke Business Pro
-                    untuk memakai warna sendiri dan menambahkan logo di tengah QR.
+                    Paket Starter memakai warna bawaan dan tanpa logo. Upgrade ke
+                    Business Pro untuk kustomisasi penuh.
                   </p>
                 )}
 
                 {/* Warna */}
-                <div
-                  className={
-                    bisaKustom ? 'space-y-3' : 'space-y-3 opacity-50 pointer-events-none select-none'
-                  }
-                  aria-disabled={!bisaKustom}
-                >
+                <div className="space-y-3">
                   <p className="text-xs font-semibold text-neutral-700">Warna QR</p>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div
+                    className={
+                      bisaKustom
+                        ? 'flex flex-wrap items-center gap-2'
+                        : 'flex flex-wrap items-center gap-2 opacity-50 pointer-events-none select-none'
+                    }
+                  >
                     {PRESET_COLORS.map((c) => (
                       <button
                         key={c.hex}
@@ -387,10 +419,7 @@ export default function NewQrPage() {
                       </button>
                     ))}
 
-                    <label
-                      className="relative w-9 h-9 rounded-xl border-2 border-dashed border-neutral-300 cursor-pointer overflow-hidden flex items-center justify-center hover:border-indigo-400 transition-colors"
-                      title="Warna kustom"
-                    >
+                    <label className="relative w-9 h-9 rounded-xl border-2 border-dashed border-neutral-300 cursor-pointer overflow-hidden flex items-center justify-center hover:border-indigo-400 transition-colors">
                       <input
                         type="color"
                         value={color}
@@ -411,6 +440,13 @@ export default function NewQrPage() {
                     />
                   </div>
 
+                  {kunciWarna && (
+                    <p className="text-xs text-amber-700 flex items-center gap-1">
+                      <Lock className="h-3 w-3" />
+                      Mengganti warna perlu paket Business Pro.
+                    </p>
+                  )}
+
                   {!isScannableColor(color) && (
                     <p className="text-xs text-amber-700 flex items-center gap-1">
                       <Info className="h-3 w-3" />
@@ -422,7 +458,9 @@ export default function NewQrPage() {
 
                 {/* Logo */}
                 <div className="space-y-2 border-t border-neutral-100 pt-3">
-                  <p className="text-xs font-semibold text-neutral-700">Logo di tengah QR</p>
+                  <p className="text-xs font-semibold text-neutral-700">
+                    Logo di tengah QR
+                  </p>
 
                   {!bisaKustom ? (
                     <div className="flex items-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2.5">
@@ -440,7 +478,7 @@ export default function NewQrPage() {
                         className="w-10 h-10 rounded-lg object-contain bg-white border border-neutral-100"
                       />
                       <span className="flex-1 min-w-0 text-xs text-neutral-600 truncate">
-                        {logoName}
+                        {logoName || 'Logo tersimpan'}
                       </span>
                       <Button
                         type="button"
@@ -476,8 +514,7 @@ export default function NewQrPage() {
                         Pilih gambar logo
                       </Button>
                       <p className="mt-1.5 text-[11px] text-neutral-400">
-                        PNG, JPG, atau WEBP. Maksimal 200 KB — otomatis diperkecil
-                        kalau lebih besar.
+                        PNG, JPG, atau WEBP. Maksimal 200 KB.
                       </p>
                     </div>
                   )}
@@ -488,25 +525,25 @@ export default function NewQrPage() {
               <div className="pt-5 border-t border-neutral-100 flex flex-col sm:flex-row items-center gap-3">
                 <Button
                   type="submit"
-                  disabled={loading || !title.trim() || !urlLooksValid}
+                  disabled={saving || !title.trim() || !urlLooksValid}
                   className="w-full sm:w-auto sm:min-w-[190px] h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl shadow-sm shadow-indigo-500/25 gap-2 disabled:opacity-50"
                 >
-                  {loading ? (
+                  {saving ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Membuat...
+                      Menyimpan...
                     </>
                   ) : (
                     <>
-                      <QrIcon className="h-4 w-4" />
-                      Buat QR Code
+                      <Save className="h-4 w-4" />
+                      Simpan Perubahan
                     </>
                   )}
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => router.back()}
+                  onClick={() => router.push(`/dashboard/qr-codes/${id}`)}
                   className="w-full sm:w-auto h-11 rounded-xl text-neutral-600 hover:text-neutral-900"
                 >
                   Batal
@@ -516,98 +553,53 @@ export default function NewQrPage() {
           </CardContent>
         </Card>
 
-        {/* ── Right: Live preview ────────────────────────────────── */}
+        {/* Right: Preview */}
         <div className="lg:col-span-2 space-y-5 lg:sticky lg:top-24 h-fit">
           <Card className="border border-neutral-200/80 shadow-xs rounded-2xl bg-white overflow-hidden">
             <CardHeader className="pb-3 border-b border-neutral-100">
               <CardTitle className="text-sm font-bold text-neutral-900 flex items-center gap-2">
                 <QrIcon className="h-4 w-4 text-indigo-600" />
-                Pratinjau Langsung
+                Pratinjau
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="flex flex-col items-center">
-                <div className="p-4 bg-white rounded-2xl border border-neutral-200 shadow-sm">
-                  {origin ? (
-                    <QRCodeCanvas
-                      value={previewValue}
-                      size={176}
-                      bgColor="#ffffff"
-                      fgColor={color}
-                      level="H"
-                      includeMargin
-                      imageSettings={
-                        logo
-                          ? {
-                              src: logo,
-                              height: 40,
-                              width: 40,
-                              excavate: true,
-                            }
-                          : undefined
-                      }
-                    />
-                  ) : (
-                    <div className="w-[176px] h-[176px] flex items-center justify-center bg-neutral-50 rounded-lg">
-                      <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
+                <div className={`p-4 bg-white rounded-2xl border border-neutral-200 shadow-sm ${isActive ? '' : 'opacity-40'}`}>
+                  <QRCodeCanvas
+                    value={shortUrl}
+                    size={176}
+                    bgColor="#ffffff"
+                    fgColor={color}
+                    level="H"
+                    includeMargin
+                    imageSettings={
+                      logo
+                        ? {
+                            src: logo,
+                            height: 40,
+                            width: 40,
+                            excavate: true,
+                          }
+                        : undefined
+                    }
+                  />
                 </div>
+
+                {!isActive && (
+                  <p className="mt-3 text-[11px] font-semibold text-amber-700">
+                    QR sedang nonaktif
+                  </p>
+                )}
 
                 <div className="mt-4 w-full rounded-xl bg-neutral-50 border border-neutral-100 px-3 py-2.5 text-center">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
                     Link pendek
                   </p>
                   <p className="text-xs font-mono text-neutral-700 break-all leading-relaxed">
-                    {origin ? previewValue.replace(/^https?:\/\//, '') : '—'}
+                    {shortUrl.replace(/^https?:\/\//, '')}
                   </p>
                 </div>
-
-                <p className="mt-3 text-[11px] text-neutral-400 text-center leading-relaxed">
-                  Tampilan ilustrasi. Link pendek asli dibuat otomatis saat kamu
-                  menyimpan.
-                </p>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Feature highlights */}
-          <Card className="border border-neutral-200/80 shadow-xs rounded-2xl bg-white">
-            <CardContent className="p-5 space-y-3">
-              {[
-                {
-                  icon: Zap,
-                  tone: 'bg-indigo-50 border-indigo-100 text-indigo-600',
-                  title: 'Dinamis & bisa diedit',
-                  desc: 'Ganti URL target tanpa cetak ulang QR-nya.',
-                },
-                {
-                  icon: BarChart3,
-                  tone: 'bg-emerald-50 border-emerald-100 text-emerald-600',
-                  title: 'Analitik real-time',
-                  desc: 'Perangkat, OS, browser, dan negara tiap scan.',
-                },
-                {
-                  icon: Globe,
-                  tone: 'bg-amber-50 border-amber-100 text-amber-600',
-                  title: 'Link pendek otomatis',
-                  desc: 'Domain kamu sendiri, siap dibagikan.',
-                },
-              ].map((f) => (
-                <div key={f.title} className="flex items-start gap-3">
-                  <div
-                    className={`w-8 h-8 rounded-lg border ${f.tone} flex items-center justify-center shrink-0`}
-                  >
-                    <f.icon className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-neutral-900">{f.title}</p>
-                    <p className="text-[11px] text-neutral-500 leading-relaxed">
-                      {f.desc}
-                    </p>
-                  </div>
-                </div>
-              ))}
             </CardContent>
           </Card>
         </div>

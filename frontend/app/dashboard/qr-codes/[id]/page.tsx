@@ -16,6 +16,7 @@ interface QrDetail {
   target_url: string;
   short_code: string;
   color: string;
+  logo: string | null;
   is_active: boolean;
   created_at: string;
   scan_count: number;
@@ -135,14 +136,25 @@ export default function QrDetailPage() {
           <CardContent className="pt-4 space-y-6">
             {/* QR Preview */}
             <div className="flex flex-col items-center justify-center py-6 bg-neutral-50/50 rounded-xl border border-neutral-100">
-              <div className="p-4 bg-white rounded-xl border border-neutral-200 shadow-sm" id="qr-canvas">
+              <div className="p-4 bg-white rounded-xl border border-neutral-200 shadow-sm">
                 <QRCodeCanvas
+                  id="qr-canvas"
                   value={shortUrl}
                   size={220}
                   bgColor="#ffffff"
                   fgColor={qr.color || '#4f46e5'}
                   level="H"
                   includeMargin
+                  imageSettings={
+                    qr.logo
+                      ? {
+                          src: qr.logo,
+                          height: 50,
+                          width: 50,
+                          excavate: true,
+                        }
+                      : undefined
+                  }
                 />
               </div>
               <p className="mt-3 text-sm font-semibold text-neutral-900 text-center">Scan untuk menguji</p>

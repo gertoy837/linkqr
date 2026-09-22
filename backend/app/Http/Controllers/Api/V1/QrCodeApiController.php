@@ -29,6 +29,12 @@ class QrCodeApiController extends Controller
             ->orderByDesc('created_at')
             ->paginate($perPage);
 
+        // `logo` disembunyikan dari daftar: isinya data URL yang bisa ratusan
+        // kilobyte, dan 25 item per halaman berarti respons membengkak sampai
+        // beberapa megabyte tanpa ada pemakai yang memerlukannya di daftar.
+        // Detail (show) tetap mengirimnya.
+        $qrs->getCollection()->makeHidden('logo');
+
         return response()->json($qrs);
     }
 
