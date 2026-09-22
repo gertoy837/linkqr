@@ -54,3 +54,6 @@ logs/
 
 # backup sebelum penyesuaian tampilan login/register
 .backup-auth/
+
+# backup sebelum perbaikan harga tahunan
+.backup-harga/

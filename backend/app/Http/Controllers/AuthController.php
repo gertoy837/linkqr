@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\PlanPricing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -67,7 +68,7 @@ class AuthController extends Controller
             // yet, this only tells the client which checkout to open.
             'requested_plan' => $requestedPlan,
             'requested_billing_cycle' => $requestedCycle,
-            'requires_payment' => (int) (config("plans.{$requestedPlan}.price.{$requestedCycle}") ?? 0) > 0,
+            'requires_payment' => PlanPricing::requiresPayment($requestedPlan, $requestedCycle),
         ], 201);
     }
 

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\PlanPricing;
 use Illuminate\Http\Request;
 
 /**
@@ -148,9 +149,9 @@ class AdminInvoiceController extends Controller
                 return 0;
             }
 
-            return $invoice->billing_cycle === 'yearly'
-                ? (int) round($price / 12)
-                : $price;
+            // amount tahunan = harga per bulan x 12, jadi membaginya
+            // kembali dengan jumlah bulan yang dicakup menghasilkan MRR.
+            return PlanPricing::monthlyRateFromAmount($price, $invoice->billing_cycle);
         });
 
         return response()->json([

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Payments\PaymentManager;
+use App\Support\PlanPricing;
 use Illuminate\Http\Request;
 
 /**
@@ -63,7 +64,8 @@ class InvoiceController extends Controller
             ], 422);
         }
 
-        $amount = (int) ($definition['price'][$cycle] ?? 0);
+        // Siklus tahunan = harga per bulan x 12 (bayar setahun di muka).
+        $amount = PlanPricing::chargeAmount($planKey, $cycle);
 
         // A free plan needs no invoice — the old direct switch is still valid
         // for it, and only for it.

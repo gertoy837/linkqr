@@ -34,3 +34,6 @@ composer.phar
 
 # backup sebelum penyelarasan bahasa
 .backup-lang/
+
+# backup sebelum perbaikan harga tahunan
+.backup-harga/

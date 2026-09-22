@@ -458,9 +458,33 @@ export default function HomePage() {
                   <p className="text-xs text-indigo-600 mt-1">Untuk UMKM & Restoran</p>
                   <div className="my-6">
                     <span className="text-4xl font-extrabold text-neutral-900">
-                      {billingCycle === 'yearly' ? 'Rp 49.000' : 'Rp 59.000'}
+                      {/* Angka di landing memang hardcoded (halaman ini dirender
+                          tanpa memanggil API paket). Sumber kebenarannya adalah
+                          backend/config/plans.php + App\Support\PlanPricing:
+                          monthly 59000; yearly 47200 (= 20% lebih murah);
+                          tagihan setahun = 47200 x 12 = 566400. Ubah di sini
+                          kalau harga di backend berubah. */}
+                      {billingCycle === 'yearly' ? 'Rp 47.200' : 'Rp 59.000'}
                     </span>
                     <span className="text-xs text-neutral-500"> / bulan</span>
+                    {billingCycle === 'yearly' && (
+                      // Dua hal yang harus terlihat saat siklus tahunan:
+                      // (1) harga normal dicoret, supaya diskon 20% bisa
+                      //     diverifikasi sendiri oleh pengunjung;
+                      // (2) total setahun yang benar-benar ditagih, supaya
+                      //     "Rp 47.200/bulan" tidak disangka nominal tagihan.
+                      <div className="mt-1.5 space-y-0.5">
+                        <p className="text-xs text-neutral-400">
+                          <span className="line-through">Rp 59.000</span>{' '}
+                          <span className="font-semibold text-emerald-600">
+                            hemat 20%
+                          </span>
+                        </p>
+                        <p className="text-xs text-neutral-500">
+                          Ditagih tahunan Rp 566.400
+                        </p>
+                      </div>
+                    )}
                   </div>
                   <ul className="space-y-3 text-sm text-neutral-700">
                     {[

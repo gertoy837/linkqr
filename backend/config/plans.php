@@ -40,8 +40,14 @@ return [
         'name' => 'Business Pro',
         'tagline' => 'Untuk UMKM & Restoran',
         'price' => [
+            // Keduanya adalah HARGA PER BULAN, bukan total tagihan.
+            //   monthly 59000 = tarif normal
+            //   yearly  47200 = 20% lebih murah, dibayar setahun di muka
+            // Nominal invoice tahunan = yearly x 12 = 566400, dihitung oleh
+            // App\Support\PlanPricing::chargeAmount(). JANGAN menulis total
+            // setahun di sini — itu sumber bug tagihan kurang bayar.
             'monthly' => 59000,
-            'yearly' => 49000,
+            'yearly' => 47200,
         ],
         'limits' => [
             'qr_codes' => null,

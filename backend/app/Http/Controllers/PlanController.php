@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Tenant;
+use App\Support\PlanPricing;
 use Illuminate\Http\Request;
 
 class PlanController extends Controller
@@ -63,7 +64,7 @@ class PlanController extends Controller
         // endpoint used to flip the plan immediately, which handed out paid
         // tiers for free to anyone who called it. A paid switch must create an
         // invoice first, so one exists before the plan changes.
-        $amount = (int) ($definition['price'][$cycle] ?? 0);
+        $amount = PlanPricing::chargeAmount($planKey, $cycle);
 
         if ($amount > 0) {
             return response()->json([

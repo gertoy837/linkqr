@@ -27,7 +27,10 @@ const PLAN_CHOICES = [
   {
     key: 'business_pro',
     name: 'Business Pro',
-    price: { monthly: 59000, yearly: 49000 },
+    // Harga PER BULAN (bukan total tagihan). Sumber kebenaran:
+    // backend/config/plans.php + App\Support\PlanPricing::chargeAmount().
+    // Tagihan tahunan = 47200 x 12 = 566400.
+    price: { monthly: 59000, yearly: 47200 },
     note: 'Unlimited QR & scan',
     popular: true,
   },
@@ -210,13 +213,26 @@ export default function RegisterPage() {
                       <span className="text-[11px] font-medium text-neutral-500">
                         {' '}
                         /bulan
-                        {/* Harga tahunan adalah harga efektif per bulan (sama
-                            seperti landing page). Tanpa keterangan ini, angka
-                            yang lebih murah bisa disangka tarif bulanan. */}
-                        {cycle === 'yearly' && ', ditagih tahunan'}
                       </span>
                     )}
                   </p>
+                  {cycle === 'yearly' && choice.price.yearly > 0 && (
+                    // Harga normal dicoret + total setahun yang ditagih, supaya
+                    // diskon tahunan terlihat dan nominalnya tidak mengejutkan.
+                    <div className="mt-0.5 space-y-0.5">
+                      <p className="text-[10px] text-neutral-400">
+                        <span className="line-through">
+                          {rupiah(choice.price.monthly)}
+                        </span>{' '}
+                        <span className="font-semibold text-emerald-600">
+                          hemat 20%
+                        </span>
+                      </p>
+                      <p className="text-[10px] font-medium text-neutral-400">
+                        Ditagih tahunan {rupiah(choice.price.yearly * 12)}
+                      </p>
+                    </div>
+                  )}
                   <p className="mt-0.5 text-[11px] leading-snug text-neutral-500">
                     {choice.note}
                   </p>

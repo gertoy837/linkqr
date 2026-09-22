@@ -469,12 +469,35 @@ export default function BillingPage() {
                   <h3 className="text-lg font-bold text-neutral-900">{plan.name}</h3>
                   <p className="text-xs text-neutral-500 mt-1">{plan.tagline}</p>
 
-                  <div className="my-5 flex items-baseline gap-1.5">
-                    <span className="text-3xl font-extrabold text-neutral-900 tracking-tight">
-                      {rupiah(price)}
-                    </span>
-                    {!plan.contact_only && price !== null && price > 0 && (
-                      <span className="text-xs text-neutral-500">/ bulan</span>
+                  <div className="my-5">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-extrabold text-neutral-900 tracking-tight">
+                        {rupiah(price)}
+                      </span>
+                      {!plan.contact_only && price !== null && price > 0 && (
+                        <span className="text-xs text-neutral-500">/ bulan</span>
+                      )}
+                    </div>
+                    {!plan.contact_only && cycle === 'yearly' && price !== null && price > 0 && (
+                      // Harga di atas adalah tarif per bulan; invoice-nya
+                      // setahun penuh. Harga bulanan normal dicoret supaya
+                      // diskonnya terlihat dan nominal tagihan tidak
+                      // mengejutkan.
+                      <div className="mt-1 space-y-0.5">
+                        {plan.price.monthly !== null && plan.price.monthly > price && (
+                          <p className="text-[11px] text-neutral-400">
+                            <span className="line-through">
+                              {rupiah(plan.price.monthly)}
+                            </span>{' '}
+                            <span className="font-semibold text-emerald-600">
+                              hemat 20%
+                            </span>
+                          </p>
+                        )}
+                        <p className="text-[11px] text-neutral-500">
+                          Ditagih tahunan {rupiah(price * 12)}
+                        </p>
+                      </div>
                     )}
                   </div>
 
