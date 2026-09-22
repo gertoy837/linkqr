@@ -89,6 +89,8 @@ class InvoiceController extends Controller
             ->latest()
             ->first();
 
+        $existing?->expireIfLapsed();
+
         if ($existing && $existing->isActionable()) {
             return response()->json([
                 'message' => 'Lanjutkan pembayaran invoice yang sudah dibuat.',
@@ -131,6 +133,8 @@ class InvoiceController extends Controller
     {
         $this->authorizeInvoice($request, $invoice);
 
+        $invoice->expireIfLapsed();
+
         if (!$invoice->isActionable()) {
             return response()->json([
                 'message' => 'Invoice ini tidak bisa lagi dibayar. Buat invoice baru.',
@@ -144,7 +148,11 @@ class InvoiceController extends Controller
             'payer_note' => 'nullable|string|max:500',
         ]);
 
-        $path = $request->file('proof')->store('payment-proofs', 'public');
+        // Disk privat: bukti transfer bukan aset publik.
+        $path = $request->file('proof')->store(
+            PaymentProofController::FOLDER,
+            PaymentProofController::DISK
+        );
 
         $invoice->proof_path = $path;
         $invoice->payer_note = $validated['payer_note'] ?? null;
