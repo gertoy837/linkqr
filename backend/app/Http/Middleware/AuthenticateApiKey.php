@@ -18,6 +18,9 @@ class AuthenticateApiKey
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // X-API-Key adalah cara resminya. bearerToken() ikut diterima karena
+        // sebagian klien HTTP hanya bisa mengirim header Authorization — dan itu
+        // aman: token Sanctum tidak akan pernah cocok dengan hash kunci mana pun.
         $plain = $request->header('X-API-Key')
             ?: $request->bearerToken();
 
@@ -28,7 +31,13 @@ class AuthenticateApiKey
             ], 401);
         }
 
-        $key = ApiKey::with('tenant')->where('key_hash', hash('sha256', $plain))->first();
+        // Lewat model, bukan query inline: hashing kunci hanya boleh ditulis di
+        // satu tempat supaya aturannya tidak menyimpang antara model dan middleware.
+        $key = ApiKey::findByPlainKey($plain);
+
+        if ($key) {
+            $key->loadMissing('tenant');
+        }
 
         if (!$key) {
             return response()->json([

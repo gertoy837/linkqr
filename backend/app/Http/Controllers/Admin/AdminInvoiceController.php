@@ -22,7 +22,12 @@ class AdminInvoiceController extends Controller
         $validated = $request->validate([
             'status' => 'nullable|string|in:' . implode(',', Invoice::STATUSES),
             'q' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
         ]);
+
+        $page = (int) ($validated['page'] ?? 1);
+        $perPage = (int) ($validated['per_page'] ?? 50);
 
         $query = Invoice::with(['tenant:id,name', 'user:id,name,email'])
             ->latest();
@@ -39,8 +44,20 @@ class AdminInvoiceController extends Controller
             });
         }
 
+        // Sebelumnya limit(100) keras: invoice ke-101 dan seterusnya tidak pernah
+        // bisa dilihat operator. Sekarang bisa dipaginasi, dengan bentuk respons
+        // yang sama supaya frontend tidak perlu diubah.
+        $total = (clone $query)->count();
+        $invoices = $query->offset(($page - 1) * $perPage)->limit($perPage)->get();
+
         return response()->json([
-            'data' => $query->limit(100)->get(),
+            'data' => $invoices,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+            ],
             'counts' => [
                 'pending' => Invoice::where('status', Invoice::STATUS_PENDING)->count(),
                 'awaiting' => Invoice::where('status', Invoice::STATUS_AWAITING)->count(),
@@ -113,7 +130,11 @@ class AdminInvoiceController extends Controller
     {
         $tenants = Tenant::withCount('users', 'qrCodes')->get();
 
-        $paidInvoices = Invoice::where('status', Invoice::STATUS_PAID)->get();
+        // Eager load tenant: tanpa ini, perhitungan MRR di bawah melakukan satu
+        // query tambahan untuk SETIAP invoice lunas (N+1).
+        $paidInvoices = Invoice::with('tenant')
+            ->where('status', Invoice::STATUS_PAID)
+            ->get();
 
         // Normalise every paid invoice to a monthly figure so a yearly plan is
         // comparable with a monthly one.

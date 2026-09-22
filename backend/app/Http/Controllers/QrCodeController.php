@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\QrCode;
-use App\Models\QrScanLog;
+use App\Support\DateGrouping;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class QrCodeController extends Controller
@@ -28,17 +28,23 @@ class QrCodeController extends Controller
             'logo' => 'nullable|string',
         ]);
 
-        // Enforce the plan's QR quota. The landing page advertises "5 QR Code
-        // Dinamis" on Starter, so the limit has to actually exist server-side -
-        // otherwise the tier is just marketing copy.
+        // Kuota paket ditegakkan di dalam User::createQrWithinQuota(), dalam satu
+        // transaksi dengan pembuatan QR — memeriksa lalu membuat sebagai dua
+        // langkah terpisah membiarkan dua permintaan paralel dua-duanya lolos.
         //
-        // Counted per USER, not per tenant: the dashboard lists this user's own
-        // QR codes, so a shared-tenant count made the usage bar disagree with
-        // the list (a user with 4 QR saw "5/5 habis" because a colleague's QR
-        // was included).
+        // Dihitung per USER, bukan per tenant: dashboard menampilkan QR milik
+        // user ini sendiri, jadi hitungan tingkat tenant membuat bar pemakaian
+        // tidak cocok dengan daftarnya.
         $user = $request->user();
 
-        if (!$user->canCreateQr()) {
+        $qr = $user->createQrWithinQuota([
+            'title' => $validated['title'],
+            'target_url' => $validated['target_url'],
+            'color' => $validated['color'] ?? '#2563EB',
+            'logo' => $validated['logo'] ?? null,
+        ]);
+
+        if (!$qr) {
             return response()->json([
                 'message' => "Kuota QR Code paket {$user->planName()} sudah habis "
                     . "({$user->qrUsed()}/{$user->qrLimit()}). Upgrade paket untuk menambah QR.",
@@ -49,20 +55,6 @@ class QrCodeController extends Controller
                 ],
             ], 403);
         }
-
-        // Generate unique short code
-        do {
-            $shortCode = Str::random(6);
-        } while (QrCode::where('short_code', $shortCode)->exists());
-
-        $qr = $request->user()->qrCodes()->create([
-            'title' => $validated['title'],
-            'target_url' => $validated['target_url'],
-            'short_code' => $shortCode,
-            'color' => $validated['color'] ?? '#2563EB',
-            'logo' => $validated['logo'] ?? null,
-            'tenant_id' => $request->user()->tenant_id,
-        ]); 
 
         return response()->json($qr, 201);
     }
@@ -101,26 +93,49 @@ class QrCodeController extends Controller
     {
         $this->authorize('view', $qrCode);
 
-        $totalScans = $qrCode->scan_count;
-        $logs = $qrCode->scanLogs;
+        $since = Carbon::now()->subDays(29)->startOfDay();
 
-        // Per day (last 30 days)
-        $perDay = $logs->groupBy(function ($log) {
-            return $log->scanned_at->format('Y-m-d');
-        })->map->count();
+        // Semua agregasi dilakukan di SQL. Versi sebelumnya memuat SELURUH scan
+        // log ke memori lalu mengelompokkannya di PHP — untuk QR yang sudah
+        // discan puluhan ribu kali itu memuat puluhan ribu model sekaligus.
+        $perDay = $qrCode->scanLogs()
+            ->where('scanned_at', '>=', $since)
+            ->select(
+                DB::raw(DateGrouping::dayExpression('scanned_at') . ' as day'),
+                DB::raw('COUNT(*) as total')
+            )
+            ->groupBy('day')
+            ->pluck('total', 'day');
 
-        // Device breakdown
-        $devices = $logs->groupBy('device_type')->map->count();
+        $devices = $qrCode->scanLogs()
+            ->whereNotNull('device_type')
+            ->where('device_type', '!=', '')
+            ->select('device_type as label', DB::raw('COUNT(*) as total'))
+            ->groupBy('device_type')
+            ->pluck('total', 'label');
 
-        // Top countries
-        $countries = $logs->groupBy('country')->map->count()->sortDesc()->take(5);
+        $countries = $qrCode->scanLogs()
+            ->whereNotNull('country')
+            ->where('country', '!=', '')
+            ->select('country as label', DB::raw('COUNT(*) as total'))
+            ->groupBy('country')
+            ->orderByDesc('total')
+            ->limit(5)
+            ->pluck('total', 'label');
+
+        // Terbaru dulu. Tanpa orderBy, "recent_logs" justru mengembalikan scan
+        // paling LAMA karena SQLite mengembalikan baris dalam urutan penyisipan.
+        $recent = $qrCode->scanLogs()
+            ->orderByDesc('scanned_at')
+            ->limit(10)
+            ->get();
 
         return response()->json([
-            'total_scans' => $totalScans,
-            'last_30_days' => $perDay->take(30),
+            'total_scans' => $qrCode->scan_count,
+            'last_30_days' => $perDay,
             'devices' => $devices,
             'countries' => $countries,
-            'recent_logs' => $logs->take(10),
+            'recent_logs' => $recent,
         ]);
     }
 }

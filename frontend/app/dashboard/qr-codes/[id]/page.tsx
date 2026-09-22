@@ -263,7 +263,12 @@ export default function QrDetailPage() {
               </div>
             )}
 
-            {!stats?.devices?.length && !stats?.countries?.length && !stats?.last_30_days?.length && (
+            {/* devices/countries/last_30_days semuanya OBJEK, bukan array, jadi
+                .length selalu undefined dan syarat lama selalu benar — blok
+                "Belum ada data scan" ini muncul bahkan ketika datanya ada. */}
+            {Object.keys(stats?.devices ?? {}).length === 0 &&
+              Object.keys(stats?.countries ?? {}).length === 0 &&
+              Object.keys(stats?.last_30_days ?? {}).length === 0 && (
               <div className="text-center py-8 border-t border-neutral-100">
                 <QrIcon className="h-10 w-10 text-neutral-300 mx-auto mb-3" />
                 <p className="text-sm text-neutral-500">Belum ada data scan</p>

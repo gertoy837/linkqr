@@ -9,6 +9,8 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -103,6 +105,40 @@ class User extends Authenticatable
     public function planName(): string
     {
         return $this->tenant?->planName() ?? 'Starter';
+    }
+
+    /**
+     * Buat QR baru sambil menegakkan kuota paket, dalam satu transaksi.
+     *
+     * Versi sebelumnya memeriksa kuota lalu membuat QR sebagai dua langkah
+     * terpisah, jadi dua permintaan paralel bisa dua-duanya lolos pengecekan.
+     * Baris user dikunci supaya pemeriksaan dan penulisan tidak bisa disela.
+     *
+     * Catatan: lockForUpdate() hanya benar-benar mengunci di MySQL/MariaDB dan
+     * PostgreSQL. Di SQLite (database yang dipakai sekarang) Laravel
+     * mengabaikannya, jadi di sana perlindungannya sebatas transaksi — cukup
+     * untuk kasus ini karena pembuatan QR adalah aksi langka per user.
+     *
+     * @return QrCode|null null kalau kuota paketnya sudah habis.
+     */
+    public function createQrWithinQuota(array $attributes): ?QrCode
+    {
+        return DB::transaction(function () use ($attributes) {
+            $locked = static::whereKey($this->getKey())->lockForUpdate()->first();
+
+            if (!$locked || !$locked->canCreateQr()) {
+                return null;
+            }
+
+            do {
+                $shortCode = Str::random(6);
+            } while (QrCode::where('short_code', $shortCode)->exists());
+
+            return $locked->qrCodes()->create($attributes + [
+                'short_code' => $shortCode,
+                'tenant_id' => $locked->tenant_id,
+            ]);
+        });
     }
 
     /** Scans against this user's own QR codes since the 1st of this month. */

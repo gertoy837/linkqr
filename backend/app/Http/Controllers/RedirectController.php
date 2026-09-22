@@ -26,7 +26,6 @@ class RedirectController extends Controller
 
         $ip = RequestInspector::clientIp($request);
         $parsed = RequestInspector::parse($request->userAgent());
-        $geo = RequestInspector::geo($request, $ip);
 
         // Deduplicate: skip logging if same IP + QR + device_type within 2 seconds
         // (catches browser prefetch/preload that fires duplicate requests)
@@ -37,6 +36,12 @@ class RedirectController extends Controller
             ->exists();
 
         if (!$recentDuplicate) {
+            // Geo dipanggil DI DALAM blok ini. Sebelumnya dipanggil sebelum
+            // pengecekan duplikat, jadi setiap request prefetch yang justru
+            // ingin dibuang tetap memicu HTTP call ke ip-api.com — sinkron, di
+            // jalur redirect, dengan limit 45 permintaan/menit.
+            $geo = RequestInspector::geo($request, $ip);
+
             QrScanLog::create([
                 'qr_code_id' => $qr->id,
                 'ip_address' => $ip,

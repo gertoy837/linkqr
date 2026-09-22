@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\QrCode;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 /**
  * API publik untuk integrator (paket Enterprise).
@@ -59,28 +58,22 @@ class QrCodeApiController extends Controller
         $apiKey = $request->attributes->get('api_key');
         $tenant = $apiKey->tenant;
 
-        // Kuota tetap dihitung per user pemilik kunci, konsisten dengan dashboard.
+        // Kuota tetap dihitung per user pemilik kunci, konsisten dengan dashboard,
+        // dan ditegakkan di dalam transaksi yang sama dengan pembuatan QR.
         $owner = $apiKey->user;
 
-        if (!$owner->canCreateQr()) {
+        $qr = $owner->createQrWithinQuota([
+            'title' => $validated['title'],
+            'target_url' => $validated['target_url'],
+            'color' => $validated['color'] ?? '#2563EB',
+        ]);
+
+        if (!$qr) {
             return response()->json([
                 'message' => "Kuota QR Code paket {$owner->planName()} sudah habis ({$owner->qrUsed()}/{$owner->qrLimit()}).",
                 'code' => 'qr_limit_reached',
             ], 403);
         }
-
-        do {
-            $shortCode = Str::random(6);
-        } while (QrCode::where('short_code', $shortCode)->exists());
-
-        $qr = QrCode::create([
-            'user_id' => $owner->id,
-            'tenant_id' => $tenant->id,
-            'title' => $validated['title'],
-            'target_url' => $validated['target_url'],
-            'short_code' => $shortCode,
-            'color' => $validated['color'] ?? '#2563EB',
-        ]);
 
         return response()->json([
             'message' => 'QR code dibuat.',

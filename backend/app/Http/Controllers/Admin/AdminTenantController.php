@@ -25,7 +25,12 @@ class AdminTenantController extends Controller
             'q' => 'nullable|string|max:100',
             'plan' => 'nullable|string|in:' . implode(',', array_keys(config('plans', []))),
             'status' => 'nullable|string|in:active,suspended,expired',
+            'page' => 'nullable|integer|min:1',
+            'per_page' => 'nullable|integer|min:5|max:100',
         ]);
+
+        $page = (int) ($validated['page'] ?? 1);
+        $perPage = (int) ($validated['per_page'] ?? 50);
 
         $query = Tenant::query()
             ->withCount(['users', 'qrCodes'])
@@ -59,10 +64,18 @@ class AdminTenantController extends Controller
             };
         }
 
-        $tenants = $query->latest()->limit(100)->get();
+        // Sebelumnya limit(100) keras tanpa cara melihat sisanya.
+        $total = (clone $query)->count();
+        $tenants = $query->latest()->offset(($page - 1) * $perPage)->limit($perPage)->get();
 
         return response()->json([
             'data' => $tenants->map(fn (Tenant $t) => $this->summaryPayload($t))->values(),
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+            ],
             'counts' => [
                 'total' => Tenant::count(),
                 'active' => Tenant::where('is_active', true)->count(),

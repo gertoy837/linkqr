@@ -30,7 +30,7 @@ class ManualQrisGateway implements PaymentGateway
     public function createInvoice(User $user, string $plan, string $cycle, int $amount): Invoice
     {
         $uniqueCode = config('payment.unique_code_enabled', true)
-            ? random_int(1, 99)
+            ? $this->pickUniqueCode($plan, $cycle)
             : 0;
 
         return Invoice::create([
@@ -76,6 +76,29 @@ class ManualQrisGateway implements PaymentGateway
     public function requiresManualVerification(): bool
     {
         return true;
+    }
+
+    /**
+     * Kode unik 1-99 yang belum dipakai invoice aktif pada paket dan siklus yang
+     * sama.
+     *
+     * Kode ini penanda agar admin bisa mencocokkan transfer masuk ke satu invoice.
+     * Dengan random_int(1, 99) dua pelanggan bisa mendapat kode yang sama untuk
+     * paket yang sama, dan pencocokannya jadi ambigu — terutama karena nilai
+     * transfernya pun jadi identik.
+     */
+    private function pickUniqueCode(string $plan, string $cycle): int
+    {
+        $taken = Invoice::where('plan', $plan)
+            ->where('billing_cycle', $cycle)
+            ->whereIn('status', [Invoice::STATUS_PENDING, Invoice::STATUS_AWAITING])
+            ->pluck('unique_code')
+            ->all();
+
+        $available = array_values(array_diff(range(1, 99), $taken));
+
+        // Semua kode terpakai: jatuh ke 0 (tanpa kode) daripada bertabrakan.
+        return $available === [] ? 0 : $available[array_rand($available)];
     }
 
     public function handleWebhook(Request $request): void

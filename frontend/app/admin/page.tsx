@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -154,10 +154,36 @@ export default function AdminPage() {
     };
   }, [load]);
 
-  const proofUrl = useMemo(() => {
-    if (!active?.proof_path) return null;
-    const base = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/?$/, '');
-    return `${base}/storage/${active.proof_path}`;
+  // Bukti transfer disajikan lewat endpoint ber-auth, bukan /storage publik,
+  // jadi gambarnya diambil sebagai blob memakai bearer token lalu dijadikan
+  // object URL. Object URL-nya dicabut saat dialog ditutup supaya tidak bocor.
+  const [proofUrl, setProofUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!active?.proof_path) {
+      setProofUrl(null);
+      return;
+    }
+
+    let objectUrl: string | null = null;
+    let cancelled = false;
+
+    api
+      .get(`/admin/invoices/${active.id}/proof`, { responseType: 'blob' })
+      .then((res) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(res.data as Blob);
+        setProofUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setProofUrl(null);
+      });
+
+    return () => {
+      cancelled = true;
+      setProofUrl(null);
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
   }, [active]);
 
   const handleDecision = async (kind: 'verify' | 'reject') => {

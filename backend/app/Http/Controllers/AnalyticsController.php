@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\QrScanLog;
+use App\Support\DateGrouping;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -29,6 +30,11 @@ class AnalyticsController extends Controller
         }
         $qrIds = $qrQuery->pluck('id');
 
+        // "QR Aktif" harus benar-benar menghitung yang aktif. Sebelumnya memakai
+        // jumlah seluruh QR milik user, jadi angka di dashboard (dan di kolom
+        // "QR Aktif" pada ekspor CSV) tidak cocok dengan kenyataan.
+        $activeQrCount = $user->qrCodes()->where('is_active', true)->count();
+
         $empty = [
             'total_scans' => 0,
             'scans_today' => 0,
@@ -36,7 +42,7 @@ class AnalyticsController extends Controller
             'previous_window' => 0,
             'growth' => 0.0,
             'unique_visitors' => 0,
-            'active_qr' => $qrIds->count(),
+            'active_qr' => $activeQrCount,
             'days' => $days,
             'series' => [],
             'by_device' => [],
@@ -79,7 +85,10 @@ class AnalyticsController extends Controller
         // ---- Daily series (zero-filled so the chart is continuous) -------
         $rawSeries = $base()
             ->where('scanned_at', '>=', $windowStart)
-            ->select(DB::raw("strftime('%Y-%m-%d', scanned_at) as day"), DB::raw('COUNT(*) as total'))
+            ->select(
+                DB::raw(DateGrouping::dayExpression('scanned_at') . ' as day'),
+                DB::raw('COUNT(*) as total')
+            )
             ->groupBy('day')
             ->pluck('total', 'day');
 
@@ -148,7 +157,7 @@ class AnalyticsController extends Controller
             'previous_window' => $scansPrev,
             'growth' => $growth,
             'unique_visitors' => $uniqueVisitors,
-            'active_qr' => $qrIds->count(),
+            'active_qr' => $activeQrCount,
             'days' => $days,
             'series' => $series,
             'by_device' => $breakdown('device_type'),

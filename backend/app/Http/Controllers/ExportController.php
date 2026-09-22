@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\QrCode;
 use App\Models\QrScanLog;
+use App\Support\DateGrouping;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -50,7 +51,10 @@ class ExportController extends Controller
         $uniqueVisitors = (clone $logs)->whereNotNull('ip_address')->distinct()->count('ip_address');
 
         $series = (clone $logs)
-            ->select(DB::raw("strftime('%Y-%m-%d', scanned_at) as day"), DB::raw('COUNT(*) as total'))
+            ->select(
+                DB::raw(DateGrouping::dayExpression('scanned_at') . ' as day'),
+                DB::raw('COUNT(*) as total')
+            )
             ->groupBy('day')
             ->pluck('total', 'day');
 

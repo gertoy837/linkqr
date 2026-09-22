@@ -5,6 +5,7 @@ namespace App\Models;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class Invoice extends Model
@@ -133,7 +134,12 @@ class Invoice extends Model
 
     /**
      * Can the customer still act on this invoice (pay / re-upload proof)?
-     * A lapsed pending invoice is auto-flipped to `expired` on read.
+     *
+     * Ini murni pembacaan. Sebelumnya method ini diam-diam menulis ke database
+     * (menandai invoice basi sebagai `expired`), sehingga sebuah predikat punya
+     * efek samping. Pemanggil yang memang ingin housekeeping itu sekarang
+     * memanggil expireIfLapsed() secara eksplisit, dan command
+     * invoices:expire-stale tetap menangani invoice yang tidak pernah dibuka lagi.
      */
     public function isActionable(): bool
     {
@@ -142,10 +148,6 @@ class Invoice extends Model
         }
 
         if ($this->isExpired()) {
-            if (in_array($this->status, [self::STATUS_PENDING, self::STATUS_REJECTED], true)) {
-                $this->forceFill(['status' => self::STATUS_EXPIRED])->save();
-            }
-
             return false;
         }
 
@@ -154,6 +156,26 @@ class Invoice extends Model
             self::STATUS_AWAITING,
             self::STATUS_REJECTED,
         ], true);
+    }
+
+    /**
+     * Tandai invoice yang sudah lewat batas waktu sebagai kedaluwarsa.
+     *
+     * @return bool true kalau statusnya benar-benar berubah.
+     */
+    public function expireIfLapsed(): bool
+    {
+        if (!$this->isExpired()) {
+            return false;
+        }
+
+        if (!in_array($this->status, [self::STATUS_PENDING, self::STATUS_REJECTED], true)) {
+            return false;
+        }
+
+        $this->forceFill(['status' => self::STATUS_EXPIRED])->save();
+
+        return true;
     }
 
     /**
@@ -170,19 +192,25 @@ class Invoice extends Model
             return;
         }
 
+        // Paket dan masa aktif lama harus dibaca SEBELUM ditimpa. Versi
+        // sebelumnya menimpa $tenant->plan lebih dulu, lalu membandingkannya
+        // dengan $this->plan — perbandingan yang jadi selalu benar sehingga
+        // syaratnya mati dan tidak pernah menyaring apa pun.
+        $previousPlan = $tenant->plan;
+        $wasActive = $tenant->plan_expires_at !== null
+            && $tenant->plan_expires_at->isFuture();
+
         $tenant->plan = $this->plan;
         $tenant->billing_cycle = $this->billing_cycle;
 
         if ($this->plan === 'starter') {
             $tenant->plan_expires_at = null;
         } else {
-            $stillActive = $tenant->plan === $this->plan
-                && $tenant->plan_expires_at !== null
-                && $tenant->plan_expires_at->isFuture();
+            // Perpanjangan paket yang sama menambah dari tanggal kedaluwarsa
+            // lama; pindah paket (atau paket yang sudah lapsed) mulai dari hari ini.
+            $isRenewal = $previousPlan === $this->plan && $wasActive;
 
-            $base = $stillActive
-                ? $tenant->plan_expires_at->copy()
-                : Carbon::now();
+            $base = $isRenewal ? $tenant->plan_expires_at->copy() : Carbon::now();
 
             $tenant->plan_expires_at = $this->billing_cycle === 'yearly'
                 ? $base->addYear()
@@ -194,18 +222,23 @@ class Invoice extends Model
 
     public function markPaid(?int $verifiedBy = null, ?string $note = null): void
     {
-        $this->status = self::STATUS_PAID;
-        $this->paid_at = $this->paid_at ?? Carbon::now();
-        $this->verified_at = Carbon::now();
-        $this->verified_by = $verifiedBy;
+        // Satu transaksi: invoice tidak boleh tercatat lunas sementara paketnya
+        // gagal diterapkan. Tanpa ini, kegagalan di activatePlan() meninggalkan
+        // pelanggan yang sudah bayar tapi tidak mendapat fiturnya.
+        DB::transaction(function () use ($verifiedBy, $note) {
+            $this->status = self::STATUS_PAID;
+            $this->paid_at = $this->paid_at ?? Carbon::now();
+            $this->verified_at = Carbon::now();
+            $this->verified_by = $verifiedBy;
 
-        if ($note !== null) {
-            $this->admin_note = $note;
-        }
+            if ($note !== null) {
+                $this->admin_note = $note;
+            }
 
-        $this->save();
+            $this->save();
 
-        $this->activatePlan();
+            $this->activatePlan();
+        });
     }
 
     // ---------------------------------------------------------------------
