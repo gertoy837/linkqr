@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminInvoiceController;
 use App\Http\Controllers\Admin\AdminTenantController;
+use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\Api\V1\QrCodeApiController;
 use App\Http\Controllers\ApiKeyController;
@@ -67,6 +68,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/tenants/{tenant}/extend', [AdminTenantController::class, 'extend']);
         Route::post('/tenants/{tenant}/suspend', [AdminTenantController::class, 'suspend']);
         Route::post('/tenants/{tenant}/activate', [AdminTenantController::class, 'activate']);
+
+        // Manajemen user
+        Route::get('/users', [AdminUserController::class, 'index']);
+        Route::get('/users/{user}', [AdminUserController::class, 'show']);
+        Route::post('/users/{user}/role', [AdminUserController::class, 'updateRole']);
+        Route::post('/users/{user}/password', [AdminUserController::class, 'resetPassword']);
+        Route::post('/users/{user}/revoke-sessions', [AdminUserController::class, 'revokeSessions']);
+        Route::delete('/users/{user}', [AdminUserController::class, 'destroy']);
     });
 
     // QR Codes
