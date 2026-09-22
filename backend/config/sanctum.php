@@ -50,7 +50,10 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Sebelumnya null: token tidak pernah kedaluwarsa, jadi token yang tercuri
+    // (mis. lewat XSS) berlaku selamanya. 14 hari sepadan dengan umur cookie di
+    // frontend, dan user cukup login ulang sekali.
+    'expiration' => (int) env('SANCTUM_EXPIRATION', 60 * 24 * 14),
 
     /*
     |--------------------------------------------------------------------------

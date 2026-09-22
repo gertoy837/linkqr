@@ -8,6 +8,7 @@ use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PaymentProofController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QrCodeController;
 use App\Http\Controllers\RedirectController;
@@ -20,11 +21,12 @@ Route::get('/health', function () {
 });
 
 // Public redirect (consumed by the Next.js /s/[shortCode] proxy)
-Route::get('/s/{shortCode}', [RedirectController::class, 'redirect']);
+Route::get('/s/{shortCode}', [RedirectController::class, 'redirect'])
+    ->middleware('throttle:scan');
 
 // Auth
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', [AuthController::class, 'user']);
@@ -42,8 +44,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/invoices', [InvoiceController::class, 'index']);
     Route::post('/invoices', [InvoiceController::class, 'store']);
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show']);
-    Route::post('/invoices/{invoice}/proof', [InvoiceController::class, 'uploadProof']);
+    Route::post('/invoices/{invoice}/proof', [InvoiceController::class, 'uploadProof'])
+        ->middleware('throttle:proof-upload');
     Route::post('/invoices/{invoice}/cancel', [InvoiceController::class, 'cancel']);
+    // Bukti transfer: file-nya privat, jadi harus lewat endpoint ber-auth.
+    Route::get('/invoices/{invoice}/proof', [PaymentProofController::class, 'customer']);
 
     // Operator console
     Route::middleware('admin')->prefix('admin')->group(function () {
@@ -52,6 +57,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/invoices/{invoice}', [AdminInvoiceController::class, 'show']);
         Route::post('/invoices/{invoice}/verify', [AdminInvoiceController::class, 'verify']);
         Route::post('/invoices/{invoice}/reject', [AdminInvoiceController::class, 'reject']);
+        Route::get('/invoices/{invoice}/proof', [PaymentProofController::class, 'admin']);
 
         // Workspace management
         Route::get('/tenants', [AdminTenantController::class, 'index']);
@@ -73,11 +79,20 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/export/qr-codes', [ExportController::class, 'qrCodes']);
     });
 
-    // API keys (paket Enterprise)
+    // API keys (paket Enterprise).
+    //
+    // index sengaja TIDAK digerbangi: halaman pengaturan memakainya untuk tahu
+    // apakah fitur ini aktif, supaya bisa menampilkan ajakan upgrade, bukan
+    // error. Yang digerbangi adalah semua operasi yang benar-benar mengubah
+    // data — sebelumnya paket Starter bisa membuat API key (HTTP 201) walau
+    // kuncinya tidak akan pernah bisa dipakai.
     Route::get('/api-keys', [ApiKeyController::class, 'index']);
-    Route::post('/api-keys', [ApiKeyController::class, 'store']);
-    Route::post('/api-keys/{apiKey}/toggle', [ApiKeyController::class, 'toggle']);
-    Route::delete('/api-keys/{apiKey}', [ApiKeyController::class, 'destroy']);
+
+    Route::middleware('feature:api_access')->group(function () {
+        Route::post('/api-keys', [ApiKeyController::class, 'store']);
+        Route::post('/api-keys/{apiKey}/toggle', [ApiKeyController::class, 'toggle']);
+        Route::delete('/api-keys/{apiKey}', [ApiKeyController::class, 'destroy']);
+    });
 });
 
 /*
@@ -85,7 +100,7 @@ Route::middleware('auth:sanctum')->group(function () {
 | Public API v1 — autentikasi lewat X-API-Key (paket Enterprise)
 |--------------------------------------------------------------------------
 */
-Route::middleware('api.key')->prefix('v1')->group(function () {
+Route::middleware(['api.key', 'throttle:api-key'])->prefix('v1')->group(function () {
     Route::get('/qr-codes', [QrCodeApiController::class, 'index']);
     Route::post('/qr-codes', [QrCodeApiController::class, 'store']);
     Route::get('/qr-codes/{shortCode}', [QrCodeApiController::class, 'show']);

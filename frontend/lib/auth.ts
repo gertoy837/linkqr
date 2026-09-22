@@ -83,6 +83,22 @@ export function getUser(): User | null {
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+/**
+ * Cookie hanya ditandai Secure kalau halaman memang dilayani lewat HTTPS.
+ * Menandainya Secure di http://localhost membuat cookie-nya tidak pernah
+ * tersimpan, dan middleware akan terus memantulkan user ke /login saat
+ * pengembangan lokal.
+ *
+ * Catatan: cookie ini sengaja tidak HttpOnly karena di-set dari JavaScript.
+ * Membuatnya HttpOnly butuh login melewati route handler Next.js, dan selama
+ * token juga disimpan di localStorage (yang memang dibutuhkan untuk memanggil
+ * API dengan bearer token), HttpOnly saja belum menutup jalur XSS. Yang
+ * benar-benar mengurangi risikonya adalah masa berlaku token yang terbatas —
+ * lihat SANCTUM_EXPIRATION di backend.
+ */
+const SECURE_FLAG =
+  typeof window !== 'undefined' && window.location.protocol === 'https:' ? '; Secure' : '';
+
 export function setAuth(token: string, user: User): void {
   localStorage.setItem('token', token);
   localStorage.setItem('user', JSON.stringify(user));
@@ -96,8 +112,8 @@ export function setAuth(token: string, user: User): void {
   // it is only a routing hint — the API re-checks `is_admin` on every admin
   // request, so a tampered cookie grants nothing.
   if (typeof document !== 'undefined') {
-    document.cookie = `token=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
-    document.cookie = `role=${user.is_admin ? 'admin' : 'user'}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+    document.cookie = `token=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${SECURE_FLAG}`;
+    document.cookie = `role=${user.is_admin ? 'admin' : 'user'}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax${SECURE_FLAG}`;
   }
 }
 
