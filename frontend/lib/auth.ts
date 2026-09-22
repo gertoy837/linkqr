@@ -22,6 +22,14 @@ export interface User {
 export interface AuthResponse {
   token: string;
   user: User;
+  /**
+   * Plan that was picked on the pricing page during signup. It is only an
+   * intent — the account is always created on the free plan, and this plan
+   * activates once its invoice is verified.
+   */
+  requested_plan?: string;
+  requested_billing_cycle?: string;
+  requires_payment?: boolean;
 }
 
 export async function login(email: string, password: string): Promise<AuthResponse> {

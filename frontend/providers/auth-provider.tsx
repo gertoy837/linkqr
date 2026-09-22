@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import api from '@/lib/api';
-import { User, login as apiLogin, register as apiRegister, logout as apiLogout, getToken, getUser, setAuth, clearAuth } from '@/lib/auth';
+import { User, AuthResponse, login as apiLogin, register as apiRegister, logout as apiLogout, getToken, getUser, setAuth, clearAuth } from '@/lib/auth';
 
 interface AuthContextType {
   user: User | null;
@@ -16,7 +16,7 @@ interface AuthContextType {
     password_confirmation: string,
     plan?: string,
     billing_cycle?: string
-  ) => Promise<void>;
+  ) => Promise<AuthResponse>;
   logout: () => Promise<void>;
 }
 
@@ -96,6 +96,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuth(res.token, res.user);
     setToken(res.token);
     setUser(res.user);
+    // Handed back so the signup page can route to checkout when the visitor
+    // picked a paid plan — the account itself is always created on Starter.
+    return res;
   };
 
   const logout = async () => {

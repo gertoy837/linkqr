@@ -70,7 +70,27 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register(name, email, password, passwordConfirmation, plan, cycle);
+      const res = await register(name, email, password, passwordConfirmation, plan, cycle);
+
+      // Signing up can't activate a paid plan. The account is created on
+      // Starter and the plan the visitor picked is carried to checkout, where
+      // it activates once the payment is verified.
+      if (res.requires_payment && res.requested_plan) {
+        const chosen = PLAN_CHOICES.find((c) => c.key === res.requested_plan);
+        toast({
+          title: 'Akun berhasil dibuat',
+          description: `Kamu mulai dari paket Starter. Selesaikan pembayaran ${
+            chosen?.name ?? res.requested_plan
+          } untuk mengaktifkannya.`,
+        });
+        router.push(
+          `/dashboard/billing?plan=${res.requested_plan}&cycle=${
+            res.requested_billing_cycle ?? 'monthly'
+          }`
+        );
+        return;
+      }
+
       toast({ title: 'Berhasil daftar', description: 'Selamat datang di LinkQR!' });
       router.push('/dashboard');
     } catch (err: any) {
@@ -171,7 +191,9 @@ export default function RegisterPage() {
 
                 <p className="text-[11px] text-slate-500 flex items-start gap-1.5 pt-1">
                   <Sparkles className="h-3 w-3 text-indigo-500 mt-0.5 shrink-0" />
-                  Paket bisa diubah kapan saja dari halaman Paket &amp; Tagihan.
+                  Akun selalu mulai dari paket Starter. Paket berbayar aktif setelah
+                  pembayaran diverifikasi, dan bisa diubah kapan saja dari halaman
+                  Paket &amp; Tagihan.
                 </p>
               </div>
 

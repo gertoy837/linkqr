@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\Tenant;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class PlanController extends Controller
@@ -31,13 +30,10 @@ class PlanController extends Controller
     /**
      * POST /api/plan/select
      *
-     * No payment gateway is wired in yet, so a paid plan activates immediately
-     * and is fully usable. That is deliberate: this product ships as a
-     * self-hosted package, so the buyer plugs in their own gateway here.
-     *
-     * To add billing: create the invoice + redirect to your provider (Midtrans,
-     * Stripe, ...) BEFORE mutating the tenant, then call the activation block
-     * below from the payment webhook instead of from this request.
+     * Legacy switch, kept for the free plan and for downgrades. Paid tiers are
+     * refused here: they activate only after a verified payment, so they must
+     * go through POST /invoices (see InvoiceController). The billing page
+     * already uses /invoices for every switch.
      */
     public function select(Request $request)
     {
@@ -63,22 +59,29 @@ class PlanController extends Controller
             ], 422);
         }
 
-        // ---- Activation ----
-        $tenant->plan = $planKey;
-        $tenant->billing_cycle = $cycle;
+        // A paid plan may only be activated by a verified payment. This
+        // endpoint used to flip the plan immediately, which handed out paid
+        // tiers for free to anyone who called it. A paid switch must create an
+        // invoice first, so one exists before the plan changes.
+        $amount = (int) ($definition['price'][$cycle] ?? 0);
 
-        if ($planKey === 'starter') {
-            $tenant->plan_expires_at = null;
-        } else {
-            $tenant->plan_expires_at = $cycle === 'yearly'
-                ? Carbon::now()->addYear()
-                : Carbon::now()->addMonth();
+        if ($amount > 0) {
+            return response()->json([
+                'message' => 'Paket berbayar hanya aktif setelah pembayaran diverifikasi. Buat invoice lewat POST /invoices.',
+                'code' => 'payment_required',
+                'requires_payment' => true,
+            ], 422);
         }
 
+        // ---- Activation (free plan only) ----
+        $tenant->plan = $planKey;
+        $tenant->billing_cycle = $cycle;
+        $tenant->plan_expires_at = null;
         $tenant->save();
 
         return response()->json([
             'message' => "Paket berhasil diubah ke {$definition['name']}.",
+            'requires_payment' => false,
             'current' => $this->userPayload($request->user()->fresh()),
         ]);
     }

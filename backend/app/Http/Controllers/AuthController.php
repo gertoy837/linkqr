@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Tenant;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -22,11 +21,17 @@ class AuthController extends Controller
             'billing_cycle' => 'nullable|string|in:monthly,yearly',
         ]);
 
-        $planKey = $validated['plan'] ?? 'starter';
-        $cycle = $validated['billing_cycle'] ?? 'monthly';
+        // The plan picked on the pricing page is an *intent*, not a purchase.
+        // It is echoed back so the client can send the visitor straight to
+        // checkout, but it never lands on the tenant: a paid plan is only ever
+        // activated by a verified payment (InvoiceController + the admin
+        // verification console). Signing up used to write this straight onto
+        // the tenant, which handed out Business Pro for free.
+        $requestedPlan = $validated['plan'] ?? 'starter';
+        $requestedCycle = $validated['billing_cycle'] ?? 'monthly';
 
         // Enterprise is sales-led: it can't be self-activated at signup.
-        if (!empty(config("plans.{$planKey}.contact_only"))) {
+        if (!empty(config("plans.{$requestedPlan}.contact_only"))) {
             throw ValidationException::withMessages([
                 'plan' => ['Paket Enterprise diaktifkan lewat tim kami. Hubungi support untuk melanjutkan.'],
             ]);
@@ -34,15 +39,16 @@ class AuthController extends Controller
 
         // Every signup gets its own workspace. Without this, all users landed
         // in tenant 1 and shared the same QR inventory and quota.
+        //
+        // A new workspace always starts on the free plan, so no one can reach a
+        // paid tier without paying for it.
         $tenant = Tenant::create([
             'name' => $validated['name'] . "'s Workspace",
             'slug' => $this->uniqueSlug($validated['name']),
             'is_active' => true,
-            'plan' => $planKey,
-            'billing_cycle' => $cycle,
-            'plan_expires_at' => $planKey === 'starter'
-                ? null
-                : ($cycle === 'yearly' ? Carbon::now()->addYear() : Carbon::now()->addMonth()),
+            'plan' => 'starter',
+            'billing_cycle' => 'monthly',
+            'plan_expires_at' => null,
         ]);
 
         $user = User::create([
@@ -57,6 +63,11 @@ class AuthController extends Controller
         return response()->json([
             'user' => $user->load('tenant'),
             'token' => $token,
+            // Echoed for the signup page: nothing has been charged or activated
+            // yet, this only tells the client which checkout to open.
+            'requested_plan' => $requestedPlan,
+            'requested_billing_cycle' => $requestedCycle,
+            'requires_payment' => (int) (config("plans.{$requestedPlan}.price.{$requestedCycle}") ?? 0) > 0,
         ], 201);
     }
 

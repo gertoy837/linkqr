@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -107,7 +107,8 @@ export default function BillingPage() {
     fetchPlan();
   }, [fetchPlan]);
 
-  const handleSelect = async (planKey: string) => {
+  const handleSelect = async (planKey: string, cycleOverride?: 'monthly' | 'yearly') => {
+    const chosenCycle = cycleOverride ?? cycle;
     const target = data?.plans.find((p) => p.key === planKey);
 
     if (target?.contact_only) {
@@ -124,7 +125,7 @@ export default function BillingPage() {
       // a paid plan returns an invoice + the QRIS instructions to display.
       const res = await api.post('/invoices', {
         plan: planKey,
-        billing_cycle: cycle,
+        billing_cycle: chosenCycle,
       });
 
       if (res.data?.requires_payment === false) {
@@ -150,6 +151,36 @@ export default function BillingPage() {
       setSwitching(null);
     }
   };
+
+  // Signup forwards here with ?plan=...&cycle=... when the visitor picked a paid
+  // plan. Their account is still on Starter — nothing was activated — so open
+  // the checkout once and let the QRIS instructions do the explaining.
+  const checkoutOpened = useRef(false);
+
+  useEffect(() => {
+    if (checkoutOpened.current || loading || !data) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const wanted = params.get('plan');
+    if (!wanted) return;
+
+    checkoutOpened.current = true;
+
+    const wantedCycle: 'monthly' | 'yearly' =
+      params.get('cycle') === 'yearly' ? 'yearly' : 'monthly';
+
+    const target = data.plans.find((p) => p.key === wanted);
+    if (!target || target.contact_only || wanted === data.current.plan) return;
+
+    setCycle(wantedCycle);
+
+    const amount =
+      wantedCycle === 'yearly' ? target.price.yearly : target.price.monthly;
+
+    if (amount && amount > 0) {
+      void handleSelect(wanted, wantedCycle);
+    }
+  }, [data, loading, handleSelect]);
 
   const openInvoice = async (inv: Invoice) => {
     try {
@@ -186,6 +217,14 @@ export default function BillingPage() {
   }
 
   const { current, plans } = data;
+
+  // Surfaced so a customer who just signed up understands why they are still on
+  // Starter after picking a paid plan: the invoice exists, the plan does not
+  // flip until that invoice is verified.
+  const pendingInvoice = invoices.find((inv) =>
+    ['pending', 'awaiting_verification', 'rejected'].includes(inv.status)
+  );
+
   const qrPct =
     current.usage.qr_limit && current.usage.qr_limit > 0
       ? Math.min(100, (current.usage.qr_used / current.usage.qr_limit) * 100)
@@ -252,6 +291,25 @@ export default function BillingPage() {
           )}
         </div>
       </div>
+
+      {/* A pending invoice explains why the paid plan is not active yet. */}
+      {pendingInvoice && (
+        <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4">
+          <Clock className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-xs text-amber-800">
+            <p className="font-bold">
+              Paket{' '}
+              {pendingInvoice.plan === 'business_pro' ? 'Business Pro' : pendingInvoice.plan}{' '}
+              belum aktif
+            </p>
+            <p className="mt-0.5 leading-relaxed">
+              Invoice <span className="font-mono">{pendingInvoice.number}</span> masih{' '}
+              {pendingInvoice.status_label.toLowerCase()}. Paket aktif otomatis setelah
+              pembayaran diverifikasi admin.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Usage */}
       <div className="grid md:grid-cols-2 gap-5">
@@ -347,7 +405,8 @@ export default function BillingPage() {
         <div className="text-center max-w-xl mx-auto mb-8">
           <h2 className="text-xl font-bold text-neutral-900">Ubah Paket</h2>
           <p className="text-sm text-neutral-500 mt-1">
-            Aktif langsung tanpa gateway pembayaran. Sambungkan Midtrans/Stripe kapan saja.
+            Paket Starter gratis dan langsung aktif. Paket berbayar baru aktif setelah
+            pembayaranmu diverifikasi admin.
           </p>
 
           <div className="mt-5 inline-flex items-center gap-2 p-1.5 rounded-2xl bg-neutral-50 border border-neutral-200">
