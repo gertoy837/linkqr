@@ -31,3 +31,6 @@ composer.phar
 
 # Laravel
 *.key
+
+# backup sebelum penyelarasan bahasa
+.backup-lang/

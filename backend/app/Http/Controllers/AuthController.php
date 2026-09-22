@@ -82,7 +82,7 @@ class AuthController extends Controller
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+                'email' => ['Email atau password salah. Periksa kembali, lalu coba lagi.'],
             ]);
         }
 
@@ -106,7 +106,7 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json(['message' => 'Logged out']);
+        return response()->json(['message' => 'Berhasil keluar dari akun.']);
     }
 
     public function user(Request $request)

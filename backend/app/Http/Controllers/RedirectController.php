@@ -15,7 +15,7 @@ class RedirectController extends Controller
         $qr = QrCode::with('tenant')->where('short_code', $shortCode)->first();
 
         if (!$qr || !$qr->is_active) {
-            abort(404, 'Link not found or inactive.');
+            abort(404, 'Link tidak ditemukan atau sudah tidak aktif.');
         }
 
         // Workspace yang dinonaktifkan berhenti melayani redirect. 410 Gone,

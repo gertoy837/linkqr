@@ -86,7 +86,7 @@ class QrCodeController extends Controller
     {
         $this->authorize('delete', $qrCode);
         $qrCode->delete();
-        return response()->json(['message' => 'Deleted']);
+        return response()->json(['message' => 'QR code dihapus.']);
     }
 
     public function stats(QrCode $qrCode)
