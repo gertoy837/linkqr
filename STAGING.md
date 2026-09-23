@@ -98,3 +98,25 @@ QR baru yang dibuat di produksi otomatis memakai domain `qr.kovarastudio.id`.
 - `APP_KEY` staging berbeda dari produksi — kunci enkripsi tidak dibagi.
 - Noindex aktif hanya kalau `NEXT_PUBLIC_ROBOTS_NOINDEX=true`. Produksi tidak
   menyetelnya, jadi perilakunya tidak berubah.
+
+### Dua file yang tidak ikut `git clone`
+
+Keduanya bukan rahasia, hanya tidak dilacak git:
+
+```bash
+# phpunit.xml di-gitignore (backend/.gitignore)
+cp /root/qr-analytics/backend/phpunit.xml /root/qr-analytics-staging/backend/
+
+# tests/Unit kosong, dan git tidak melacak folder kosong
+mkdir -p /root/qr-analytics-staging/backend/tests/Unit
+```
+
+`phpunit.xml` memakai `DB_DATABASE=:memory:` dan `MAIL_MAILER=array`, jadi
+menjalankan test **tidak akan pernah** menyentuh database asli atau mengirim
+email.
+
+Menjalankan test:
+
+```bash
+cd /root/qr-analytics-staging/backend && php8.4 vendor/bin/phpunit
+```
