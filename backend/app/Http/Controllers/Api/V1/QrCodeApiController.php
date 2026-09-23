@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\QrCode;
+use App\Support\ShortLink;
 use Illuminate\Http\Request;
 
 /**
@@ -84,7 +85,7 @@ class QrCodeApiController extends Controller
         return response()->json([
             'message' => 'QR code dibuat.',
             'data' => $qr,
-            'short_url' => url("/s/{$qr->short_code}"),
+            'short_url' => ShortLink::for($qr->short_code),
         ], 201);
     }
 

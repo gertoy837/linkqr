@@ -43,7 +43,7 @@ export default function HomePage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText('https://qr.gertoy.biz.id/s/demo-123');
+    navigator.clipboard.writeText('https://qr.kovarastudio.id/s/demo-123');
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -306,7 +306,7 @@ export default function HomePage() {
                     <div>
                       <p className="text-xs text-neutral-500">Short Link Yang Dihasilkan:</p>
                       <p className="text-sm font-mono font-semibold text-indigo-600 mt-0.5 truncate max-w-[280px]">
-                        https://qr.gertoy.biz.id/s/demo-123
+                        https://qr.kovarastudio.id/s/demo-123
                       </p>
                     </div>
                     <Button

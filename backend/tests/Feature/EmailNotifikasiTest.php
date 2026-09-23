@@ -343,7 +343,7 @@ class EmailNotifikasiTest extends TestCase
 
     public function test_tautan_email_menunjuk_ke_frontend_bukan_api(): void
     {
-        config(['app.frontend_url' => 'https://qr.gertoy.biz.id']);
+        config(['app.frontend_url' => 'https://qr.kovarastudio.id']);
 
         Mail::fake();
         [, $user] = $this->paket();
@@ -353,7 +353,7 @@ class EmailNotifikasiTest extends TestCase
         Mail::assertSent(ResetPassword::class, function (ResetPassword $mail) {
             // Tautan yang menunjuk ke domain API akan membingungkan pelanggan:
             // halaman reset ada di frontend.
-            return str_starts_with($mail->link, 'https://qr.gertoy.biz.id/')
+            return str_starts_with($mail->link, 'https://qr.kovarastudio.id/')
                 && !str_contains($mail->link, 'qr-api.');
         });
     }

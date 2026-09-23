@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\QrCode;
 use App\Models\QrScanLog;
 use App\Support\DateGrouping;
+use App\Support\ShortLink;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -150,7 +151,7 @@ class ExportController extends Controller
             foreach ($qrs as $qr) {
                 fputcsv($out, [
                     $qr->title,
-                    url("/s/{$qr->short_code}"),
+                    ShortLink::for($qr->short_code),
                     $qr->target_url,
                     $qr->is_active ? 'Aktif' : 'Nonaktif',
                     $qr->scan_count,

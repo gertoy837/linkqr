@@ -12,6 +12,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/dashboard/', '/admin/', '/s/', '/api/'],
       },
     ],
-    sitemap: 'https://qr.gertoy.biz.id/sitemap.xml',
+    sitemap: 'https://qr.kovarastudio.id/sitemap.xml',
   };
 }

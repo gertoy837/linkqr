@@ -16,11 +16,15 @@ class Tenant extends Model
         'plan',
         'billing_cycle',
         'plan_expires_at',
+        'renewal_reminder_stage',
+        'renewal_reminder_sent_at',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'plan_expires_at' => 'datetime',
+        'renewal_reminder_stage' => 'integer',
+        'renewal_reminder_sent_at' => 'datetime',
     ];
 
     /**

@@ -215,6 +215,12 @@ class Invoice extends Model
             $tenant->plan_expires_at = $this->billing_cycle === 'yearly'
                 ? $base->addYear()
                 : $base->addMonth();
+
+            // Siklus baru, jadi pengingatnya direset. Tanpa ini, pelanggan yang
+            // memperpanjang tidak akan pernah menerima pengingat lagi pada
+            // periode berikutnya — kolomnya masih berisi ambang periode lalu.
+            $tenant->renewal_reminder_stage = 0;
+            $tenant->renewal_reminder_sent_at = null;
         }
 
         $tenant->save();

@@ -6,7 +6,7 @@ import { Toaster } from "@/components/ui/toaster";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const BASE_URL = 'https://qr.gertoy.biz.id';
+const BASE_URL = 'https://qr.kovarastudio.id';
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),

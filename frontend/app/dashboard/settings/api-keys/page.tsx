@@ -330,7 +330,7 @@ export default function ApiKeysPage() {
           <p className="text-xs font-bold text-neutral-900">Cara pakai</p>
           <div className="rounded-xl bg-neutral-900 text-neutral-100 p-4 font-mono text-[11px] leading-relaxed overflow-x-auto">
             <div className="text-neutral-500"># Ambil daftar QR code</div>
-            curl https://qr-api.gertoy.biz.id/api/v1/qr-codes \<br />
+            curl https://qr-api.kovarastudio.id/api/v1/qr-codes \<br />
             &nbsp;&nbsp;-H &quot;X-API-Key: lqr_xxxxxxxxxxxx&quot;
           </div>
           <div className="grid sm:grid-cols-2 gap-2 text-[11px] text-neutral-600">

@@ -8,7 +8,7 @@ namespace App\Support;
  * Logo disimpan sebagai **data URL** di kolom `qr_codes.logo`, bukan file di
  * disk. Alasannya bukan malas: QR di-render di browser oleh qrcode.react dan
  * diunduh lewat canvas.toDataURL() (tombol "Download PNG"). Frontend
- * (qr.gertoy.biz.id) dan API (qr-api.gertoy.biz.id) beda origin, jadi logo
+ * (qr.kovarastudio.id) dan API (qr-api.kovarastudio.id) beda origin, jadi logo
  * yang diambil dari URL API akan mengotori canvas — toDataURL() melempar
  * SecurityError dan tombol download rusak. Data URL tidak pernah meninggalkan
  * dokumen, jadi tidak ada masalah CORS sama sekali.

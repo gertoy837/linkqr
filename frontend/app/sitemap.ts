@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const BASE_URL = 'https://qr.gertoy.biz.id';
+const BASE_URL = 'https://qr.kovarastudio.id';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

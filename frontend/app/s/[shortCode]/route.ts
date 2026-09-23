@@ -4,7 +4,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'https://qr-api.gertoy.biz.id/api';
+  process.env.NEXT_PUBLIC_API_URL || 'https://qr-api.kovarastudio.id/api';
 
 function escapeHtml(s: string): string {
   return s.replace(
