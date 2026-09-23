@@ -46,6 +46,18 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(5)->by('register:' . $request->ip())
         );
 
+        // Lupa password mengirim email ke alamat yang dikirim siapa pun, jadi
+        // dibatasi dua lapis: per IP (mencegah satu penyerang membanjiri banyak
+        // alamat) dan per email (mencegah satu alamat dibanjiri dari banyak IP).
+        RateLimiter::for('password-reset', function (Request $request) {
+            $email = mb_strtolower((string) $request->input('email'));
+
+            return [
+                Limit::perMinute(3)->by('pwreset-ip:' . $request->ip()),
+                Limit::perMinute(2)->by('pwreset-mail:' . $email),
+            ];
+        });
+
         // Redirect publik. Kuncinya IP PENGUNJUNG, bukan IP tunnel: API duduk di
         // belakang Cloudflare, jadi memakai $request->ip() akan menaruh semua
         // pengunjung di satu ember dan memblokir trafik yang sah. Batasnya

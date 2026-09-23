@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\InvoiceCreated;
 use App\Models\Invoice;
 use App\Payments\PaymentManager;
+use App\Support\Notifier;
 use App\Support\PlanPricing;
 use Illuminate\Http\Request;
 
@@ -106,12 +108,27 @@ class InvoiceController extends Controller
 
         $invoice = $gateway->createInvoice($user, $planKey, $cycle, $amount);
 
+        // Beri tahu pelanggan nominal & batas waktunya. Untuk pembayaran QRIS
+        // manual, tanpa email ini pelanggan hanya melihat layar sekali lalu
+        // tidak punya pengingat apa pun.
+        Notifier::send($user->email, new InvoiceCreated(
+            invoice: $invoice,
+            nama: $user->name,
+            link: $this->invoiceLink($invoice),
+        ), ['invoice' => $invoice->number]);
+
         return response()->json([
             'message' => 'Invoice dibuat. Selesaikan pembayaran lalu unggah bukti transfer.',
             'requires_payment' => true,
             'invoice' => $invoice,
             'instructions' => $gateway->instructions($invoice),
         ], 201);
+    }
+
+    /** Halaman pembayaran di frontend. */
+    private function invoiceLink(Invoice $invoice): string
+    {
+        return rtrim(config('app.frontend_url'), '/') . '/dashboard/billing';
     }
 
     /** GET /api/invoices/{invoice} */

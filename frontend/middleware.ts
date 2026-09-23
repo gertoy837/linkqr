@@ -1,7 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicRoutes = ['/', '/login', '/register', '/terms', '/privacy', '/api/health'];
+const publicRoutes = [
+  '/',
+  '/login',
+  '/register',
+  '/terms',
+  '/privacy',
+  '/api/health',
+  // Lupa password HARUS publik: orang yang membukanya justru orang yang tidak
+  // bisa masuk, jadi dia tidak punya token. Tanpa didaftarkan di sini,
+  // middleware memantulkannya ke /login dan halaman reset tidak pernah terbuka.
+  '/forgot-password',
+  '/reset-password',
+];
 const authRoutes = ['/login', '/register'];
 
 export function middleware(request: NextRequest) {

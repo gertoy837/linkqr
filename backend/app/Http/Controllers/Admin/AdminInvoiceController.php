@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\InvoiceRejected;
+use App\Mail\PlanActivated;
 use App\Models\Invoice;
+use App\Support\Notifier;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\PlanPricing;
@@ -94,6 +97,24 @@ class AdminInvoiceController extends Controller
 
         $invoice->markPaid($request->user()->id, $validated['note'] ?? null);
 
+        // Kabari pelanggan bahwa uangnya masuk dan paketnya menyala. Ini email
+        // yang paling ditunggu: tanpa ini pelanggan harus menebak-nebak apakah
+        // transfernya sudah diproses.
+        $pemilik = $invoice->user;
+
+        if ($pemilik) {
+            $invoice->refresh();
+            $tenant = $invoice->tenant;
+
+            Notifier::send($pemilik->email, new PlanActivated(
+                invoice: $invoice,
+                nama: $pemilik->name,
+                link: $this->dashboardLink(),
+                berlakuSampai: $tenant?->plan_expires_at,
+                fitur: $tenant?->planDefinition()['features'] ?? [],
+            ), ['invoice' => $invoice->number, 'jenis' => 'plan_activated']);
+        }
+
         return response()->json([
             'message' => "Pembayaran {$invoice->number} terverifikasi. Paket {$invoice->planName()} aktif.",
             'invoice' => $invoice->fresh(['tenant']),
@@ -115,10 +136,35 @@ class AdminInvoiceController extends Controller
         $invoice->admin_note = $validated['note'] ?? 'Bukti pembayaran tidak valid.';
         $invoice->save();
 
+        // Pelanggan yang sudah transfer lalu tidak melihat apa-apa akan
+        // mengira uangnya hilang. Alasan penolakan harus sampai ke dia.
+        $pemilik = $invoice->user;
+
+        if ($pemilik) {
+            Notifier::send($pemilik->email, new InvoiceRejected(
+                invoice: $invoice,
+                nama: $pemilik->name,
+                link: $this->billingLink(),
+                catatan: $invoice->admin_note,
+            ), ['invoice' => $invoice->number, 'jenis' => 'invoice_rejected']);
+        }
+
         return response()->json([
             'message' => 'Invoice ditolak. Customer bisa mengunggah ulang bukti.',
             'invoice' => $invoice,
         ]);
+    }
+
+    /** Halaman tagihan pelanggan. */
+    private function billingLink(): string
+    {
+        return rtrim(config('app.frontend_url'), '/') . '/dashboard/billing';
+    }
+
+    /** Dashboard pelanggan. */
+    private function dashboardLink(): string
+    {
+        return rtrim(config('app.frontend_url'), '/') . '/dashboard';
     }
 
     /**

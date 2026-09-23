@@ -91,10 +91,12 @@ export default function LoginPage() {
             <Label htmlFor="password" className="text-sm font-medium text-neutral-700">
               Password
             </Label>
-            {/* Tidak ada tautan "lupa password" karena API belum punya alur
-                reset. Admin dapat mengganti password lewat Konsol Admin >
-                Kelola User. Menampilkan tautan mati lebih buruk daripada
-                tidak ada sama sekali. */}
+            <Link
+              href="/forgot-password"
+              className="text-[13px] font-medium text-indigo-600 underline-offset-2 hover:text-indigo-700 hover:underline"
+            >
+              Lupa password?
+            </Link>
           </div>
           <PasswordInput
             id="password"

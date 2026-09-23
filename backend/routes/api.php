@@ -9,6 +9,7 @@ use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ExportController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\PasswordResetController;
 use App\Http\Controllers\PaymentProofController;
 use App\Http\Controllers\PlanController;
 use App\Http\Controllers\QrCodeController;
@@ -27,6 +28,16 @@ Route::get('/s/{shortCode}', [RedirectController::class, 'redirect'])
 
 // Auth
 Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
+
+/*
+| Lupa password. Throttle-nya sengaja terpisah dan cukup ketat: endpoint ini
+| mengirim email ke alamat mana pun yang dikirim, jadi tanpa batas dia bisa
+| dipakai untuk membanjiri inbox orang lain.
+*/
+Route::post('/forgot-password', [PasswordResetController::class, 'send'])
+    ->middleware('throttle:password-reset');
+Route::post('/reset-password', [PasswordResetController::class, 'reset'])
+    ->middleware('throttle:password-reset');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 Route::middleware('auth:sanctum')->group(function () {

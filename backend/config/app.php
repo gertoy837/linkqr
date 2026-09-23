@@ -123,4 +123,18 @@ return [
         'store' => env('APP_MAINTENANCE_STORE', 'database'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Alamat frontend
+    |--------------------------------------------------------------------------
+    |
+    | Dipakai untuk menyusun tautan di dalam email (halaman pembayaran, atur
+    | ulang password). Dipisah dari APP_URL karena API dan frontend beda
+    | domain: APP_URL menunjuk ke qr-api.*, sedangkan pelanggan membuka
+    | qr.*. Menyatukan keduanya menghasilkan tautan email yang menyesatkan.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', env('APP_URL', 'http://localhost:3006')),
+
 ];
