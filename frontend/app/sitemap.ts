@@ -3,6 +3,11 @@ import type { MetadataRoute } from 'next';
 const BASE_URL = 'https://qr.kovarastudio.id';
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  // Staging tidak perlu sitemap: halamannya sengaja tidak diindeks.
+  if (process.env.NEXT_PUBLIC_ROBOTS_NOINDEX === 'true') {
+    return [];
+  }
+
   const now = new Date();
 
   return [

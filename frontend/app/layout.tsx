@@ -8,6 +8,15 @@ const inter = Inter({ subsets: ["latin"] });
 
 const BASE_URL = 'https://qr.kovarastudio.id';
 
+/**
+ * Staging tidak boleh muncul di hasil pencarian.
+ *
+ * Kalau halaman staging terindeks Google, orang bisa menemukan versi uji
+ * produk ini — lengkap dengan data percobaan — dan mengiranya versi resmi.
+ * Produksi tidak menyetel variabel ini, jadi indeksnya tetap normal.
+ */
+const NOINDEX = process.env.NEXT_PUBLIC_ROBOTS_NOINDEX === 'true';
+
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
@@ -45,16 +54,19 @@ export const metadata: Metadata = {
     description:
       'QR Code dinamis, link pendek, dan analitik scan real-time dalam satu dashboard.',
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
+  robots: NOINDEX
+    ? // Staging: jangan diindeks sama sekali.
+      { index: false, follow: false }
+    : {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          'max-image-preview': 'large',
+          'max-snippet': -1,
+        },
+      },
   icons: {
     icon: '/favicon.ico',
     shortcut: '/favicon.ico',
